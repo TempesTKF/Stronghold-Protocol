@@ -76,11 +76,33 @@ adb install -r android/build/stronghold-shell-debug.apk
 
 ## 状态
 
-已在本机验证（用 Android SDK 的模拟器，API 36 AOSP x86_64 + AEHD 加速）：
+已在 Android 模拟器上验证（Android 16 / API 36 AOSP x86_64、AEHD 加速、1080×2400 横屏）：
 
-- 构建全流程通过，`zipalign -c 4` 通过，`apksigner` 报 v2 + v3 通过；
-- `classes.dex` 头合法、`resources.arsc` 不压缩存放、自适应图标与设置页布局齐备；
-- 包内中文文案完整（`resources.arsc` 中可检索到 UTF-8 的界面文案）。
+- 构建全流程、`zipalign -c 4`、`apksigner` v2 + v3、`classes.dex` 头合法、`resources.arsc` 不压缩存放、包内中文文案；
+- 安装启动、沉浸式横屏（`sensorLandscape` 生效，`mDisplayRotation=ROTATION_90`）、设置页与地址记忆；
+- 加载局域网服务器上的客户端：标题页与服务器大厅完整渲染、WebSocket 连接成功（顶栏显示延迟）、
+  代号输入可用、`localStorage` 跨应用重启保留；
+- 游戏的全屏按钮真的切进自定义视图（按钮回到「退出全屏」的激活态）——`onShowCustomView` 对接正确；
+- 返回键弹出「切换服务器 / 退出」。**修复记录**：Android 16 对 target 36 的应用默认启用预测性返回，
+  `onBackPressed()` 不再被调用（返回键直接把应用关掉），改为注册 `OnBackInvokedCallback`；
+- 外壳把页面 `console` 转发到 logcat（`adb logcat -s StrongholdShell:*`），游戏里缺素材的 404 一目了然。
 
-仍需真机验收：真实触控拖拽 / 长按详情的手感、音频、WebGL 帧率、刘海安全区，
-以及本地模式整体的可用性。
+仍需真机验收：真实触控手感、音频、WebGL 帧率、刘海安全区；本地模式（缺 Android arm64 的 Node 运行时）。
+
+### 在模拟器上验证
+
+```bash
+sdkmanager "emulator" "system-images;android-36;default;x86_64"     # 一次性准备
+avdmanager create avd -n stronghold -k "system-images;android-36;default;x86_64" -d pixel_10
+emulator -avd stronghold -no-window -no-audio -no-boot-anim -gpu host &
+adb wait-for-device
+adb install -r android/build/stronghold-shell-debug.apk
+adb shell am start -n app.stronghold.shell/.MainActivity
+adb exec-out screencap -p > shot.png      # 截图（exec-out 是二进制安全的，不要用 shell 重定向）
+adb shell input tap 1200 700              # 点按：坐标从截图量（WebView 内容不进无障碍树）
+adb shell input text "10.0.2.2:3000"      # 模拟器里 10.0.2.2 就是宿主的回环地址
+adb logcat -s StrongholdShell:*           # 页面 console 与加载日志
+```
+
+两个坑：**WebView 里的 DOM 不会出现在 `uiautomator dump`**（整个 WebView 是一个不透明节点），
+游戏内部只能靠截图量坐标驱动；**模拟器的 GPU 是转发或软件渲染**，帧率数字不代表真机。
