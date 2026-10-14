@@ -28,5 +28,12 @@
     <string name="dialog_exit">退出</string>
     <string name="dialog_cancel">继续游戏</string>
 
+    <string name="setup_local">本地模式（离线）</string>
+    <string name="setup_local_hint">用手机自带的服务器离线玩，不需要网络。</string>
+    <string name="local_preparing">首次启动：正在解压内置游戏文件…</string>
+    <string name="local_extracting">正在解压内置游戏文件（%1$d 个）…</string>
+    <string name="local_starting">正在启动本机服务器…</string>
+    <string name="local_failed">本机服务器启动失败：%1$s</string>
+
     <string name="remote_note">返回键可以调出「切换服务器 / 退出」。</string>
 </resources>

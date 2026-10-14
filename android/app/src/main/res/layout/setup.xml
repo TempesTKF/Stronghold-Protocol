@@ -72,6 +72,36 @@
             android:textColor="#C7D3CE"
             android:textSize="13sp" />
 
+        <LinearLayout
+            android:id="@+id/setup_local_row"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:background="#243029" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/setup_local_hint"
+                android:textColor="#9FB0AA"
+                android:textSize="13sp" />
+
+            <Button
+                android:id="@+id/setup_local"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:minWidth="140dp"
+                android:text="@string/setup_local" />
+        </LinearLayout>
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

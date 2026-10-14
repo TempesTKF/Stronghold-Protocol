@@ -30,24 +30,27 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * 单 Activity 外壳：沉浸式横屏 WebView 加载游戏服务器上的客户端。
+ * 单 Activity 外壳：沉浸式横屏 WebView 加载客户端。
  *
- * 默认连接 res/values/strings.xml 里的 default_server，首次启动直接进游戏；返回键可以切换服务器或退出。
- * 客户端与素材都由所连的服务器分发，与在手机浏览器里打开同一地址完全一致，版本检查天然一致
- * （public/js/net.js 回连页面所在 host 的 /ws）。游戏用 Fullscreen API 请求全屏，外壳实现
- * WebChromeClient.onShowCustomView 对接。
+ * 两种来源，由 {@link BuildMode} 决定首次启动用哪个：
+ *   联机版：默认连 default_server（客户端与素材由服务器分发，版本天然一致）。
+ *   离线版：默认本地开服（内置 Node 运行时与游戏文件，见 {@link LocalRuntime}），也能切去连服务器。
+ * 两者都实现 WebChromeClient.onShowCustomView 对接游戏的全屏按钮，并在连接前先探测 /healthz。
  */
 public final class MainActivity extends Activity {
 
     private static final String TAG = "StrongholdShell";
     private static final String PREFS = "shell";
     private static final String KEY_URL = "serverUrl";
+    private static final String KEY_MODE = "mode";
+    private static final int LOCAL_PORT = 3000;
 
     private FrameLayout root;
     private WebView web;
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
     private String currentUrl;
+    private final LocalRuntime local = new LocalRuntime();
 
     @Override
     protected void onCreate(Bundle state) {
@@ -65,8 +68,19 @@ public final class MainActivity extends Activity {
         setContentView(root);
         applyImmersive();
 
-        String saved = getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_URL, null);
-        loadRemote(saved == null || saved.isEmpty() ? defaultServer() : saved);
+        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
+        String mode = prefs.getString(KEY_MODE, null);
+        if (mode == null) mode = BuildMode.OFFLINE ? "local" : "remote";
+        Log.i(TAG, "start: offline=" + BuildMode.OFFLINE + " mode=" + mode
+                + " runtime=" + LocalRuntime.runtimePresent(this)
+                + " bundled=" + LocalRuntime.gameBundled(this)
+                + " dir=" + getApplicationInfo().nativeLibraryDir);
+        if ("local".equals(mode) && LocalRuntime.available(this)) {
+            startLocal();
+        } else {
+            String saved = prefs.getString(KEY_URL, null);
+            loadRemote(saved == null || saved.isEmpty() ? defaultServer() : saved);
+        }
     }
 
     @Override
@@ -77,6 +91,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        local.stop();
         if (web != null) {
             root.removeView(web);
             web.destroy();
@@ -107,7 +122,7 @@ public final class MainActivity extends Activity {
         showExitDialog();
     }
 
-    // ---- 服务器地址 ------------------------------------------------------------------------------------------------
+    // ---- 两种来源 --------------------------------------------------------------------------------------------------
 
     /** 默认服务器：res/values/strings.xml 的 default_server（可以不带协议）。 */
     private String defaultServer() {
@@ -115,10 +130,43 @@ public final class MainActivity extends Activity {
         return url != null ? url : "http://127.0.0.1:3000";
     }
 
+    /** 离线版：解压内置游戏文件 → 启动本机服务器 → 加载 127.0.0.1。 */
+    private void startLocal() {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "local").apply();
+        showMessage(getString(R.string.local_starting));
+        new Thread(() -> {
+            try {
+                local.prepare(this, message -> runOnUiThread(() -> {
+                    if (!isFinishing()) showMessage(message);
+                }));
+                runOnUiThread(() -> {
+                    if (!isFinishing()) showMessage(getString(R.string.local_starting));
+                });
+                local.start(this, LOCAL_PORT);
+                if (!LocalRuntime.waitHealthy(LOCAL_PORT, 90000)) {
+                    throw new IllegalStateException("healthz timeout");
+                }
+                Log.i(TAG, "local server ready");
+                runOnUiThread(() -> {
+                    if (!isFinishing()) loadUrl("http://127.0.0.1:" + LOCAL_PORT + "/");
+                });
+            } catch (final Exception e) {
+                final String message = e.getMessage() == null ? e.toString() : e.getMessage();
+                Log.w(TAG, "local server failed: " + message);
+                runOnUiThread(() -> {
+                    if (isFinishing()) return;
+                    getSharedPreferences(PREFS, MODE_PRIVATE).edit().remove(KEY_MODE).apply();
+                    showSetup(getString(R.string.local_failed, message));
+                });
+            }
+        }, "local-server").start();
+    }
+
     private void loadRemote(String base) {
+        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
+                .putString(KEY_MODE, "remote").putString(KEY_URL, base).apply();
         currentUrl = base;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_URL, base).apply();
-        showConnecting(base);
+        showMessage(getString(R.string.connecting, base));
         new Thread(() -> {
             final Probe result = probe(base);
             runOnUiThread(() -> {
@@ -193,27 +241,7 @@ public final class MainActivity extends Activity {
         }
     }
 
-    private void showConnecting(String base) {
-        if (web != null) {
-            root.removeView(web);
-            web.destroy();
-            web = null;
-        }
-        customView = null;
-        root.removeAllViews();
-        TextView view = new TextView(this);
-        view.setText(getString(R.string.connecting, base));
-        view.setTextColor(Color.parseColor("#C7D3CE"));
-        view.setTextSize(15f);
-        view.setGravity(android.view.Gravity.CENTER);
-        int pad = (int) (24 * getResources().getDisplayMetrics().density);
-        view.setPadding(pad, pad, pad, pad);
-        root.addView(view, new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        applyImmersive();
-    }
-
-    // ---- 三个界面：游戏 / 切换服务器 / 连不上 -------------------------------------------------------------------------
+    // ---- 四个界面：游戏 / 切换服务器 / 连不上 / 提示 ----------------------------------------------------------------
 
     private void loadUrl(String url) {
         Log.i(TAG, "load " + url);
@@ -258,6 +286,14 @@ public final class MainActivity extends Activity {
         });
         view.findViewById(R.id.setup_reset).setOnClickListener(
                 b -> input.setText(stripScheme(defaultServer())));
+
+        View localRow = view.findViewById(R.id.setup_local_row);
+        if (LocalRuntime.available(this)) {
+            localRow.setVisibility(View.VISIBLE);
+            view.findViewById(R.id.setup_local).setOnClickListener(b -> startLocal());
+        } else {
+            localRow.setVisibility(View.GONE);
+        }
         applyImmersive();
     }
 
@@ -295,6 +331,27 @@ public final class MainActivity extends Activity {
         applyImmersive();
     }
 
+    /** 一屏居中提示（解压素材、启动本机服务器时用）。 */
+    private void showMessage(String text) {
+        if (web != null) {
+            root.removeView(web);
+            web.destroy();
+            web = null;
+        }
+        customView = null;
+        root.removeAllViews();
+        TextView view = new TextView(this);
+        view.setText(text);
+        view.setTextColor(Color.parseColor("#C7D3CE"));
+        view.setTextSize(15f);
+        view.setGravity(android.view.Gravity.CENTER);
+        int pad = (int) (24 * getResources().getDisplayMetrics().density);
+        view.setPadding(pad, pad, pad, pad);
+        root.addView(view, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        applyImmersive();
+    }
+
     // ---- WebView ---------------------------------------------------------------------------------------------------
 
     private WebView createWebView() {
@@ -302,7 +359,7 @@ public final class MainActivity extends Activity {
         view.setBackgroundColor(Color.BLACK);
         WebSettings settings = view.getSettings();
         settings.setJavaScriptEnabled(true);
-        settings.setDomStorageEnabled(true);                    // 游戏的显示设置、术语偏好、重连信息存在 localStorage
+        settings.setDomStorageEnabled(true);                    // 显示设置、术语偏好、重连信息存在 localStorage
         settings.setMediaPlaybackRequiresUserGesture(false);    // BGM / 语音 / 音效不要求先点一下
         settings.setSupportZoom(false);
         settings.setBuiltInZoomControls(false);

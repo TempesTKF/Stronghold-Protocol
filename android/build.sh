@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 # 构建 Android 外壳的 debug APK（把这个仓库的浏览器客户端装进 WebView）。
 #
-#   bash android/build.sh
+#   bash android/build.sh                     # 联机版：默认连 default_server，APK 约 25KB
+#   MODE=offline bash android/build.sh        # 离线版：内置 Node 运行时与游戏文件，默认本地开服
+#   MODE=offline ABI=x86_64 bash android/build.sh   # 换 ABI（线上出货用 arm64-v8a）
 #
 # 不依赖 Gradle / Android Studio：aapt2 编译资源 → javac → d8 → jar 打包 → zipalign → apksigner。
 # 需要 JDK 17+ 与 Android SDK 的 build-tools、platform（版本见 android/README.md）。
-# 产物：android/build/stronghold-shell-debug.apk（版本号跟随 shared/constants.js 的 APP_VERSION）
+# 产物：android/build/stronghold-{shell,offline-<abi>}-debug.apk（版本号跟随 shared/constants.js 的 APP_VERSION）
 #
-# 可选内容（本地模式，默认不打进包；在位时自动加入）：
-#   android/runtimes/<abi>/lib*.so          面向 Android 的 node 可执行文件（必须叫 lib*.so）
-#   android/app/src/main/assets/game/…      游戏文件（server/ public/ data/ shared/ packs/ node_modules/ws）
+# 离线版的前置（两份都不进 git）：
+#   android/tools/stage-runtime.sh [abi]   取出 Termux 的 node 与依赖库 → android/runtimes/<abi>/
+#   android/tools/stage-game.sh [--no-assets]  收拢游戏文件（含素材）→ android/app/src/main/assets/game/
 
 set -euo pipefail
 
@@ -20,6 +22,10 @@ win() { if command -v cygpath >/dev/null 2>&1; then cygpath -m "$1"; else printf
 HERE_WIN="$(win "$HERE")"
 OUT="${OUT_DIR:-$HERE/build}"
 OUT_WIN="$(win "$OUT")"
+
+MODE="${MODE:-online}"
+ABI="${ABI:-arm64-v8a}"
+case "$MODE" in online|offline) ;; *) echo "MODE 只能是 online 或 offline（当前：$MODE）" >&2; exit 1 ;; esac
 
 # ---- 工具链探测（Git Bash 会补 .exe；macOS / Linux 走同名可执行文件）----
 find_existing() {
@@ -56,29 +62,71 @@ VERSION_NAME="$(sed -nE "s/^export const APP_VERSION = '([^']+)';.*/\1/p" "$REPO
 VERSION_CODE="$(printf '%s' "$VERSION_NAME" | sed -E 's/^([0-9]+)\.([0-9]+)\.([0-9]+).*/\1*10000 + \2*100 + \3/;t;s/.*/0/')"
 VERSION_CODE=$(( VERSION_CODE ))
 
+# 两个版本用不同的包名，可以装在同一台手机上；离线版版本号带 -offline 便于区分。
+PKG="app.stronghold.shell"
+OUT_NAME="stronghold-shell-debug.apk"
+RUNTIME_DIR="$HERE/runtimes/$ABI"
+if [ "$MODE" = offline ]; then
+  PKG="app.stronghold.shell.offline"
+  VERSION_NAME="$VERSION_NAME-offline"
+  OUT_NAME="stronghold-offline-$ABI-debug.apk"
+  [ -d "$RUNTIME_DIR" ] || { echo "离线版缺运行时：先跑 bash android/tools/stage-runtime.sh $ABI" >&2; exit 1; }
+fi
+
 MIN_SDK=26
 TARGET_SDK=36
+# 离线版要求 Android 11+：它靠 APK 里的 lib/<abi>/libnode.so 与 libz.so.1 这类带版本号的
+# .so 名字运行，而"这些名字会不会被安装器解压出来"只在 API 36 上实测过。
+if [ "$MODE" = offline ]; then MIN_SDK=30; fi
 
 need() { [ -e "$1" ] || { echo "缺少工具或文件：$1" >&2; exit 1; }; }
 need "$JDK_WIN/bin/javac"; need "$JDK_WIN/bin/java"; need "$JDK_WIN/bin/keytool"; need "$JDK_WIN/bin/jar"
 need "$BT/aapt2"; need "$BT/zipalign"; need "$BT/lib/d8.jar"; need "$BT/lib/apksigner.jar"
 need "$PLATFORM_JAR"; need "$BT/core-lambda-stubs.jar"
 
-rm -rf "$OUT"
+# 离线版把 BuildMode 换成生成的那份（源码树里的默认是联机版）
+GEN_SRC="$OUT/gen-src"
+if [ "$MODE" = offline ]; then
+  mkdir -p "$GEN_SRC/app/stronghold/shell"
+  cat > "$GEN_SRC/app/stronghold/shell/BuildMode.java" <<'JAVA'
+package app.stronghold.shell;
+
+/** 由 android/build.sh（MODE=offline）生成，见源码树里同名类的说明。 */
+public final class BuildMode {
+
+    public static final boolean OFFLINE = true;
+
+    private BuildMode() {
+    }
+}
+JAVA
+fi
+
+rm -rf "$OUT/res.zip" "$OUT/base.apk" "$OUT/aligned.apk" "$OUT/dex" "$OUT/classes" "$OUT/gen"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex"
 
 echo "[1/6] aapt2 compile resources"
 "$BT/aapt2" compile --dir "$HERE_WIN/app/src/main/res" -o "$OUT_WIN/res.zip"
 
-echo "[2/6] aapt2 link（版本 $VERSION_NAME / $VERSION_CODE）"
+echo "[2/6] aapt2 link（$MODE，版本 $VERSION_NAME / $VERSION_CODE，包名 $PKG）"
 ASSETS=()
-[ -d "$HERE/app/src/main/assets" ] && ASSETS=(--assets "$HERE_WIN/app/src/main/assets")
+# 只有离线版带 assets；否则 staged 的游戏文件会意外进包（约 550MB）
+if [ "$MODE" = offline ]; then
+  [ -f "$HERE/app/src/main/assets/game.zip" ] || { echo "离线版缺游戏文件：先跑 bash android/tools/stage-game.sh" >&2; exit 1; }
+  ASSETS=(-A "$HERE_WIN/app/src/main/assets")
+fi
+# 素材基本是已压缩格式（png / mp3 / skel…），不压缩可以省掉一次全量 deflate，读取也更直接；
+# game.zip 也按不压缩存放——运行期要整包流式解压，跳过解压更省事。
+NOSTORE=(--no-compress-regex '\.(png|jpe?g|webp|mp3|ogg|wav|skel|atlas|otf|ttf|woff2?|bin|mp4|webm|zip)$')
 "$BT/aapt2" link \
   -o "$OUT_WIN/base.apk" \
   -I "$PLATFORM_JAR" \
   --manifest "$HERE_WIN/app/src/main/AndroidManifest.xml" \
+  --rename-manifest-package "$PKG" \
+  --custom-package app.stronghold.shell \
   "${ASSETS[@]}" \
-  --java "$OUT_WIN/gen" \
+  "${NOSTORE[@]}" \
+  --java "$OUT/gen" \
   --min-sdk-version "$MIN_SDK" \
   --target-sdk-version "$TARGET_SDK" \
   --version-code "$VERSION_CODE" \
@@ -87,6 +135,11 @@ ASSETS=()
 
 echo "[3/6] javac"
 find "$HERE/app/src/main/java" "$OUT/gen" -name '*.java' | while IFS= read -r file; do printf '%s\n' "$(win "$file")"; done > "$OUT/sources.txt"
+if [ "$MODE" = offline ]; then
+  grep -v "app/stronghold/shell/BuildMode.java" "$OUT/sources.txt" > "$OUT/sources.online.txt"
+  mv "$OUT/sources.online.txt" "$OUT/sources.txt"
+  find "$GEN_SRC" -name '*.java' | while IFS= read -r file; do printf '%s\n' "$(win "$file")"; done >> "$OUT/sources.txt"
+fi
 # lambda 脱糖需要 core-lambda-stubs.jar：android.jar 里没有 java.lang.invoke.LambdaMetafactory（AGP 同样这么做）
 "$JDK_WIN/bin/javac" -encoding UTF-8 -source 8 -target 8 \
   -bootclasspath "$PLATFORM_JAR;$BT/core-lambda-stubs.jar" -classpath "$PLATFORM_JAR" \
@@ -102,17 +155,14 @@ find "$OUT/classes" -name '*.class' | while IFS= read -r file; do printf '%s\n' 
 echo "[5/6] pack + zipalign"
 # classes.dex 用 JDK 自带的 jar 写入（DEFLATE，与 aapt2 产出的条目共存，不额外依赖 Python）
 ( cd "$OUT/dex" && "$JDK_WIN/bin/jar" --update --file "$OUT_WIN/base.apk" classes.dex )
-# 可选的原生库（本地模式）：先摆成 lib/<abi>/ 结构，再以不压缩方式加入
-if [ -d "$HERE/runtimes" ] && [ -n "$(find "$HERE/runtimes" -name '*.so' -print -quit 2>/dev/null)" ]; then
+# 离线版的原生库：摆成 lib/<abi>/ 后按 DEFLATE 加入（APK 里 89MB → 约 24MB；安装时会解压到
+# nativeLibraryDir，所以压缩不会影响从那里执行 libnode.so）。
+if [ "$MODE" = offline ]; then
   rm -rf "$OUT/stage"
-  for abi_dir in "$HERE"/runtimes/*/; do
-    [ -d "$abi_dir" ] || continue
-    abi="$(basename "$abi_dir")"
-    mkdir -p "$OUT/stage/lib/$abi"
-    cp "$abi_dir"*.so "$OUT/stage/lib/$abi/" 2>/dev/null || true
-  done
-  ( cd "$OUT/stage" && "$JDK_WIN/bin/jar" --update -0 --file "$OUT_WIN/base.apk" lib )
-  echo "    已加入原生库：$(cd "$OUT/stage" && find lib -name '*.so' | tr '\n' ' ')"
+  mkdir -p "$OUT/stage/lib/$ABI"
+  cp -f "$RUNTIME_DIR"/*.so* "$RUNTIME_DIR/libnode.so" "$OUT/stage/lib/$ABI/" 2>/dev/null || true
+  ( cd "$OUT/stage" && "$JDK_WIN/bin/jar" --update --file "$OUT_WIN/base.apk" lib )
+  echo "    已加入原生库：$(cd "$OUT/stage" && find lib -type f | tr '\n' ' ')"
 fi
 "$BT/zipalign" -p -f 4 "$OUT_WIN/base.apk" "$OUT_WIN/aligned.apk"
 
@@ -129,11 +179,10 @@ fi
 "$JDK_WIN/bin/java" -jar "$BT/lib/apksigner.jar" sign \
   --ks "$(win "$KEYSTORE")" --ks-pass pass:android --key-pass pass:android \
   --ks-key-alias androiddebugkey \
-  --out "$OUT_WIN/stronghold-shell-debug.apk" "$OUT_WIN/aligned.apk"
+  --out "$OUT_WIN/$OUT_NAME" "$OUT_WIN/aligned.apk"
 
 echo ""
 echo "== artifact =="
-ls -la "$OUT/stronghold-shell-debug.apk"
-"$JDK_WIN/bin/java" -jar "$BT/lib/apksigner.jar" verify --print-certs \
-  "$OUT_WIN/stronghold-shell-debug.apk" | head -6
-"$BT/aapt2" dump badging "$OUT_WIN/stronghold-shell-debug.apk" | head -8
+ls -la "$OUT/$OUT_NAME"
+"$JDK_WIN/bin/java" -jar "$BT/lib/apksigner.jar" verify --print-certs "$OUT_WIN/$OUT_NAME" | head -6
+"$BT/aapt2" dump badging "$OUT_WIN/$OUT_NAME" | head -6
