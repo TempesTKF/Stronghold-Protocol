@@ -41,13 +41,27 @@
             android:textColorHint="#5A6763"
             android:textSize="16sp" />
 
-        <Button
-            android:id="@+id/setup_connect"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
-            android:minWidth="140dp"
-            android:text="@string/setup_connect" />
+            android:orientation="horizontal">
+
+            <Button
+                android:id="@+id/setup_connect"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:minWidth="140dp"
+                android:text="@string/setup_connect" />
+
+            <Button
+                android:id="@+id/setup_reset"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:minWidth="140dp"
+                android:text="@string/setup_reset" />
+        </LinearLayout>
 
         <TextView
             android:id="@+id/setup_status"
@@ -58,43 +72,10 @@
             android:textColor="#C7D3CE"
             android:textSize="13sp" />
 
-        <View
+        <TextView
             android:layout_width="match_parent"
-            android:layout_height="1dp"
+            android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
-            android:background="#243029" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/setup_local_section"
-            android:textColor="#F2F5F4"
-            android:textSize="14sp"
-            android:textStyle="bold" />
-
-        <Button
-            android:id="@+id/setup_local"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:minWidth="140dp"
-            android:text="@string/setup_local" />
-
-        <TextView
-            android:id="@+id/setup_local_note"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:lineSpacingExtra="2dp"
-            android:text="@string/setup_local_unavailable"
-            android:textColor="#9FB0AA"
-            android:textSize="12sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
             android:text="@string/remote_note"
             android:textColor="#5A6763"
             android:textSize="12sp" />
