@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 薄荷绿城堡：与上游 PWA 图标同一母题，纯几何路径，无外部资源。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 主墙 -->
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M32,57 L76,57 L76,78 L32,78 Z" />
+    <!-- 城垛（四个凸块） -->
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M32,49 L40,49 L40,57 L32,57 Z" />
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M43,49 L51,49 L51,57 L43,57 Z" />
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M57,49 L65,49 L65,57 L57,57 Z" />
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M68,49 L76,49 L76,57 L68,57 Z" />
+    <!-- 中央塔楼 -->
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M48,40 L60,40 L60,57 L48,57 Z" />
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M48,34 L52,34 L52,40 L48,40 Z" />
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M56,34 L60,34 L60,40 L56,40 Z" />
+    <!-- 旗杆与旗 -->
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M53,20 L55,20 L55,34 L53,34 Z" />
+    <path
+        android:fillColor="#7BD9A5"
+        android:pathData="M55,21 L71,25.5 L55,30 Z" />
+    <!-- 城门（挖空色） -->
+    <path
+        android:fillColor="#10201A"
+        android:pathData="M49,66 L59,66 L59,78 L49,78 Z" />
+</vector>
