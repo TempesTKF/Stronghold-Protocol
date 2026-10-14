@@ -1,0 +1,4 @@
+# 构建产物、本地生成的运行时与游戏文件都不进 git（素材规则见仓库根 AGENTS.md）。
+build/
+runtimes/**/*.so
+app/src/main/assets/game/
