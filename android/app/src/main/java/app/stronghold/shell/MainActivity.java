@@ -12,6 +12,7 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.window.OnBackInvokedDispatcher;
 import android.webkit.ConsoleMessage;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
@@ -52,6 +53,12 @@ public final class MainActivity extends Activity {
         super.onCreate(state);
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         WebView.setWebContentsDebuggingEnabled(true);
+        // 预测性返回：Android 16（API 36）对 target 36 的应用默认启用，那时 onBackPressed() 不再被调用，
+        // 必须注册 OnBackInvokedCallback；旧系统没有这个类，仍走下面的 onBackPressed()。
+        if (Build.VERSION.SDK_INT >= 33) {
+            getOnBackInvokedDispatcher().registerOnBackInvokedCallback(
+                    OnBackInvokedDispatcher.PRIORITY_DEFAULT, this::showExitDialog);
+        }
         root = new FrameLayout(this);
         root.setBackgroundColor(Color.BLACK);
         setContentView(root);
@@ -90,11 +97,10 @@ public final class MainActivity extends Activity {
         super.onDestroy();
     }
 
-    @Override
-    public void onBackPressed() {
-        if (customView != null) {
-            // 游戏自己请求的全屏仍开着：先让页面自己退出（WebView 对 documentElement 的全屏会随之收起）
-            if (web != null) web.evaluateJavascript("document.exitFullscreen && document.exitFullscreen()", null);
+    /** 返回键：弹「切换服务器 / 退出」。元素全屏时先让页面退出全屏（Chrome 也会自己先吃掉一次返回键）。 */
+    private void showExitDialog() {
+        if (customView != null && web != null) {
+            web.evaluateJavascript("document.exitFullscreen && document.exitFullscreen()", null);
         }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.dialog_title)
@@ -102,6 +108,13 @@ public final class MainActivity extends Activity {
                 .setNeutralButton(R.string.dialog_exit, (d, w) -> finish())
                 .setNegativeButton(R.string.dialog_cancel, null)
                 .show();
+    }
+
+    /** 未启用预测性返回的系统（API 33 以下，或以后显式关掉该行为）走这里。 */
+    @Override
+    @SuppressWarnings("deprecation")
+    public void onBackPressed() {
+        showExitDialog();
     }
 
     // ---- 界面 ------------------------------------------------------------------------------------------------------
