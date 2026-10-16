@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">卫戍协议</string>
+
+    <!-- 默认连接的服务器。换默认值只改这一行（可不带 http://）。 -->
+    <string name="default_server">103.236.99.216:50069</string>
+
+    <string name="setup_title">连接到游戏服务器</string>
+    <string name="setup_desc">默认连接我们的服务器。要连别的服务器（例如同一 Wi-Fi 下开服电脑的局域网 IP），把地址改成对应的 主机:端口。</string>
+    <string name="setup_hint">192.168.1.5:3000</string>
+    <string name="setup_connect">连接</string>
+    <string name="setup_reset">恢复默认</string>
+    <string name="setup_bad_url">地址无法识别，请检查后重试。</string>
+    <string name="setup_connecting">正在连接 %1$s …</string>
+
+    <string name="error_title">连不上 %1$s</string>
+    <string name="error_title_foreign">%1$s 不是游戏服务器</string>
+    <string name="error_hint">服务器可能没在运行，或者手机当前网络到不了它。检查地址和网络后重试，也可以换一台服务器。</string>
+    <string name="error_code">错误：%1$s</string>
+    <string name="error_retry">重试</string>
+    <string name="error_switch">切换服务器</string>
+    <string name="error_force">仍然打开</string>
+    <string name="probe_not_game">这个地址有响应，但不是卫戍协议的服务器（/healthz 没有返回游戏状态）。地址可能填错了，或者同一台机器上的另一个服务占着这个端口。</string>
+    <string name="connecting">正在连接 %1$s …</string>
+
+    <string name="dialog_title">要离开游戏吗？</string>
+    <string name="dialog_change">切换服务器</string>
+    <string name="dialog_exit">退出</string>
+    <string name="dialog_cancel">继续游戏</string>
+
+    <string name="setup_local">本地模式（离线）</string>
+    <string name="setup_local_hint">用手机自带的服务器离线玩，不需要网络。</string>
+    <string name="local_preparing">首次启动：正在解压内置游戏文件…</string>
+    <string name="local_extracting">正在解压内置游戏文件（%1$d 个）…</string>
+    <string name="local_starting">正在启动本机服务器…</string>
+    <string name="local_failed">本机服务器启动失败：%1$s</string>
+
+    <string name="remote_note">返回键可以调出「切换服务器 / 退出」。</string>
+</resources>
