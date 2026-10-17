@@ -96,6 +96,7 @@ import { HOVER_KEYS } from '../sim/content/enemies.js';
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../shared/loadoutRecord.js';
 import { isIoleta, IOLETA_ELITE_VALUE, ioletaBuyBondBonus, ioletaBondScore, ioletaCanLevel } from './botIoleta.js';
 import { formationProfile, formationRole, formationValue, contactValue, resolveFormationMode } from './botFormation.js';
+import { coordinationValue, preservesCoordination, betterCoordination } from './botCoordination.js';
 import { botRefinement } from './botRefinements.js';
 import { experimentalEnabled, refreshExperimentalPlan, experimentalBuyBonus, experimentalBondScore,
   experimentalCore, experimentalCanLevel, experimentalTarget, experimentalSearchTargets,
@@ -1272,6 +1273,59 @@ export function* planLayoutSteps(m, ps, pieces, params = LAYOUT_PARAMS, { occupi
   return out;
 }
 
+/** Complete-layout repair cloned from an existing candidate; never replans or draws random numbers. */
+export function* coordinatePlanSteps(m, ps, pieces, plan, { occupied = new Set(), recOf = null } = {}) {
+  const model = fieldModel(m, ps), map = ps.deployMap(), pgd = ps.gd || m.gd;
+  const rec = recOf || (p => p.kind === 'token' ? pgd.token(p.id) : rangeRec(ps, pgd.chess(p.id)));
+  const out = new LayoutPlan(plan);
+  out.dirs = new Map(plan.dirs);
+  if (!formationProfile(m)) return out;
+  const order = [...out.keys()].map(uid => pieces.find(p => p.uid === uid)).filter(Boolean);
+  const layout = { units: order.map(p => {
+    const key = out.get(p.uid), [r, c] = parseKey(key);
+    return unitOf(rec(p), key, r, c, out.dirOf(p.uid), model);
+  }) };
+  const taken = new Set([...occupied, ...out.values()]);
+  // [ASSUMED] Recheck the complete formation, including the old rehearsal candidates. Preserve useful
+  // contacts while rotating idle dealers toward the first engagement; only then try free legal tiles.
+  // Boss/hidden, unknown maps, intermediate buying and the explicit legacy switch retain their policy.
+  for (let pass = 0; pass < 2; pass++) {
+    let changed = false;
+    for (const move of [false, true]) for (const p of order) {
+      if (p.kind !== 'chess' || !out.has(p.uid)) continue;
+      const index = layout.units.findIndex(u => u.key === out.get(p.uid));
+      const old = layout.units[index], r0 = rec(p);
+      if (old.heal || !(old.dps > 0) || r0.attackKind === 'none') continue;
+      const before = coordinationValue(model, layout.units);
+      if (move && before.rank[0] === 0 && before.active[index]) continue;
+      let best = old, bestValue = before;
+      const tiles = move ? legalTiles(map, placeClass(ps, pgd.chess(p.id))) : [parseKey(old.key)];
+      for (const [r, c] of tiles) {
+        const key = tileKey(r, c);
+        if (taken.has(key) && key !== old.key) continue;
+        // Keep deliberate melee blocking positions on a road; a ranged body may withdraw behind the defence.
+        if (old.block && model.ground.has(old.key) && !model.ground.has(key)) continue;
+        for (const dir of PLAN_DIRS) {
+          const candidate = unitOf(r0, key, r, c, dir, model);
+          layout.units[index] = candidate;
+          const next = coordinationValue(model, layout.units);
+          if (preservesCoordination(before, next) && betterCoordination(next, bestValue)) {
+            best = candidate; bestValue = next;
+          }
+        }
+      }
+      layout.units[index] = best;
+      if (best !== old) {
+        taken.delete(old.key); taken.add(best.key);
+        out.set(p.uid, best.key); out.dirs.set(p.uid, best.dir); changed = true;
+      }
+      yield;
+    }
+    if (!changed) break;
+  }
+  return out;
+}
+
 /** A plan's direction for a piece (plans without directions ⇒ RIGHT). */
 const planDir = (plan, uid) => (plan && plan.dirs instanceof Map ? plan.dirs.get(uid) : null) ?? 'RIGHT';
 
@@ -1992,7 +2046,22 @@ export function* arrangeSteps(m, ps, { final = false, defer = false, delegate = 
     }
   } else if (taught) plans.unshift(yield* planLayoutSteps(m, ps, chosen, LAYOUT_PARAMS, { formation: true }));
   // Adaptive searches the distinct candidates within its deterministic tick budget.
-  const rehearsalLimit = adaptive ? plans.length : m.botRehearsal + (taught ? (combined ? 3 : 1) : 0);
+  let rehearsalLimit = adaptive ? plans.length : m.botRehearsal + (taught ? (combined ? 3 : 1) : 0);
+  if (taught) {
+    if (m.botRehearsal > 0) {
+      // [ASSUMED] Preserve the complete old candidate prefix under adaptive's existing stage/tick limits.
+      // Additional repairs can run only after it, when the original search still leaks and budget remains.
+      const originals = distinctPlans(plans).slice(0, rehearsalLimit);
+      const repaired = [];
+      for (const plan of originals) {
+        repaired.push(sourced(yield* coordinatePlanSteps(m, ps, chosen, plan), 'coordinate:' + (plan.source || mode)));
+      }
+      plans.splice(0, plans.length, ...distinctPlans(adaptive ? [...originals, ...repaired] : [...repaired, ...originals]));
+      rehearsalLimit = plans.length;
+    } else {
+      plans.splice(0, plans.length, yield* coordinatePlanSteps(m, ps, chosen, plans[0]));
+    }
+  }
   if (defer && plans.length > 1) {
     const job = yield* createRehearsalSteps(m, ps, chosen, plans, { delegate, limit: rehearsalLimit, limits });
     yield* applyPlanSteps(m, ps, chosen, plans[0]);

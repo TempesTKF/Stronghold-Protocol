@@ -149,7 +149,7 @@ test('contact score requires incoming contact coverage on every route; healing c
   assert.equal(contactValue(model, [{ key: 'd', block: 0, heal: true, rec: { stats: { blockCnt: 1 } } }]), 2);
 });
 
-for (const budget of [1, 3]) test(`combined rehearsal budget ${budget} retains legacy order and RNG`, t => {
+for (const budget of [1, 3]) test(`combined rehearsal budget ${budget} retains legacy candidates and RNG`, t => {
   const h = makeMatch({ mode: 'solo', difficulty: 'HARD', seed: 31 }).start().toPrep();
   t.after(() => h.m.dispose());
   const { m } = h, ps = m.order[0];
@@ -166,8 +166,10 @@ for (const budget of [1, 3]) test(`combined rehearsal budget ${budget} retains l
   const combined = arrange(m, ps, { final: true, defer: true });
   assert.equal(m.rngBots(), tail);
   assert.ok(combined);
-  assert.ok(combined.plans.length <= budget + 3);
-  if (base) assert.deepEqual(combined.plans.slice(0, base.plans.length), base.plans);
+  assert.ok(combined.plans.length <= 2 * (budget + 3));
+  if (base) for (const plan of base.plans) {
+    assert.ok(combined.plans.some(p => signature(p) === signature(plan)));
+  }
   combined.run();
   assert.ok(combined.done);
 });
@@ -216,6 +218,12 @@ for (const ids of [['chess_char_1_02_a'], ['chess_char_1_02_a', 'chess_char_1_10
       assert.equal(job.plans[0].source, 'legacy:0');
       if (legacyPlans.length) assert.equal(sigs[0], signature(legacyPlans[0]), `${mode}: the old default plan stays first`);
       if (mode === 'adaptive') {
+        assert.ok(job.plans.length <= 40);
+        const firstRepair = job.plans.findIndex(p => p.source?.startsWith('coordinate:'));
+        if (firstRepair >= 0) {
+          assert.ok(job.plans.slice(firstRepair).every(p => p.source.startsWith('coordinate:')),
+            'repairs follow the entire original adaptive prefix');
+        }
         for (const p of legacyPlans) assert.ok(sigs.includes(signature(p)), `adaptive keeps legacy candidate ${p.source}`);
         assert.deepEqual(job.limits, { stage: ADAPTIVE_STAGE, tickBudget: ADAPTIVE_CAPS * rehearsalCap(m.wave.timeLimit) });
       } else {

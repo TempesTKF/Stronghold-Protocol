@@ -266,7 +266,7 @@ test('a host that cannot run the task (error) hands it back at once', () => {
 });
 
 test('an invalid or malformed answer is refused: the server rehearses the candidates itself', () => {
-  for (const bad of [() => 99, () => -1, () => 1.5, () => 'best', () => null]) {
+  for (const bad of [() => 39, () => 99, () => -1, () => 1.5, () => 'best', () => null]) {
     const local = playTo(3, { hostId: 'p_0' });
     const wrong = playTo(3, { hostId: 'p_0', botRehearsalDelegate: true, botRehearsalDelegateMs: NEVER, host: { tamper: bad } });
     assert.equal(wrong.h.m.rehearsalStats.answered, 0, String(bad));
@@ -378,7 +378,7 @@ for (const mode of ['legacy', 'learned', 'combined']) test(`the ${mode} task car
   const frame = host.tasks[0].frame;
   assert.equal(typeof frame.taskId, 'string');
   assert.equal(frame.cap, Math.ceil(((h.m.wave.timeLimit || 60) + 5) * 30));
-  assert.ok(frame.specs.length >= 2 && frame.specs.length <= (mode === 'combined' ? 6 : mode === 'learned' ? 4 : 3));
+  assert.ok(frame.specs.length >= 2 && frame.specs.length <= (mode === 'combined' ? 12 : mode === 'learned' ? 8 : 3));
   for (const spec of frame.specs) {
     assert.equal(spec.v, 1);
     assert.equal(spec.kind, 'normal');
@@ -436,7 +436,7 @@ test('protocol rejects a forged, out-of-range or non-boolean rehearsal answer', 
   assert.equal(validateC2S({ t: 'b.rehearsalResult', taskId: 's.1.0.1', choice: 2 }), null);
   assert.equal(validateC2S({ t: 'b.rehearsalResult', taskId: 's.1.0.1', error: true }), null);
   assert.equal(validateC2S({ t: 'b.rehearsalResult', taskId: 's.1.0.1' }), null);
-  for (const choice of [8, -1, 1.5, '0', null]) {
+  for (const choice of [40, -1, 1.5, '0', null]) {
     assert.equal(typeof validateC2S({ t: 'b.rehearsalResult', taskId: 's.1.0.1', choice }), 'string', String(choice));
   }
   assert.equal(typeof validateC2S({ t: 'b.rehearsalResult', taskId: 's.1.0.1', error: false }), 'string');

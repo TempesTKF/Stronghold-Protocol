@@ -360,3 +360,6 @@ same-origin native script responses before import; all gameplay battle simulatio
 
 
 AI rehearsal proposals may carry validated stage and tickBudget limits. Host-browser and Worker evaluation and server takeover apply the same deterministic limits; omitted limits preserve exhaustive evaluation. See [Ioleta proposal](../research/ioleta-adaptive-default.md).
+
+
+Coordinated rehearsal candidates (2026-10-17, #3 follow-up): `b.rehearsalResult.choice` accepts integers 0–39, covering the maximum 20 adaptive originals plus 20 repaired copies. Server validation additionally requires an index within the specs actually sent for the live task and the correct executor. Adaptive stage/tick limits are unchanged.
