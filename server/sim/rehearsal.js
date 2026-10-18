@@ -118,16 +118,18 @@ export class RehearsalRun {
    * @param {null | (() => boolean)} [outOfBudget] checked every 4 ticks and between candidates (a candidate built in
    *   this call is always stepped or scored before the check), so a slice never exceeds 4 ticks of stepping (plus the
    *   one build of the candidate it stops on) past its budget; the first candidate of a call always runs, so every call
-   *   makes progress
+   *   makes progress. A test replay passes the same check points and ignores the wall clock (`control`).
+   * @param {null | { note?: (n: number) => void }} [control] when set, each stepped tick is counted for the journal
    * @returns {boolean} true when every candidate is done
    */
-  run(outOfBudget = null) {
+  run(outOfBudget = null, control = null) {
     // ticks stepped in THIS call: the budget is checked every 4 of them, across the candidate boundary too
     let n = 0;
     // a candidate was consumed in THIS call: the check between candidates asks once the call did anything, so a
     // candidate that never ticks (it was already finished, it could not be built, its construction threw) cannot run
     // the whole candidate list past the caller's budget either
     let worked = false;
+    const note = () => { n++; this.spent++; if (control) control.note(1); };
     while (this.index < this.candidates.length) { // loop-cap: the candidate list
       // a candidate that ended mid-slice (finished, cap, or beaten at a 64-tick check that skipped the budget test):
       // check the budget before building and stepping the next one
@@ -152,8 +154,7 @@ export class RehearsalRun {
           while (this.ticks < this.cap && !battle.finished) { // loop-cap: the tick cap
             battle.step();
             this.ticks++;
-            this.spent++;
-            n++;
+            note();
             if ((this.ticks & 63) === 0 && !this.score.alive(battle)) { beaten = true; break; }
             if (outOfBudget && (n & 3) === 0 && outOfBudget()) return false;
           }

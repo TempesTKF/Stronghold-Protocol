@@ -145,6 +145,7 @@ function Overview({ agg, gd, nickname, records }) {
   const unknownMode = Math.max(0, agg.count - agg.byMode.solo.games - agg.byMode.coop.games);
   return html`<${Section} title=${t('总览')} micro="OVERVIEW">
     <${ModdedSwitch} agg=${agg} />
+    ${agg.test > 0 ? html`<p class="t-dim" data-testid="stats-test-excluded">${t('测试对局不计入统计。')}</p>` : null}
     <div class="st-overview-details">
       <div class="st-mode-summary">
         <div class="st-profile">
