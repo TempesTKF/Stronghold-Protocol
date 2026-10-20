@@ -685,3 +685,7 @@ keys override and missing/invalid entries retain built-in text. Scope remains br
 room content and simulation. Pure geometry SDK helpers return frozen values and accept at most 1024 range cells.
 Forge UI mounts without an equivalent slot require an explicit manual-adaptation report, separate from script copying.
 Art/audio templates ship original CC0 sample media; the studio fills the target's first editable slot [ASSUMED].
+
+## 本地服务器公告
+
+所有客户端通过 GET /api/announcement 读取已发布纯文本公告，在标题主页和服务器大厅显示；每 30 秒刷新。后台草稿不会返回给玩家。独立端口后台与登录见 [ADMIN.md](../ADMIN.md)。

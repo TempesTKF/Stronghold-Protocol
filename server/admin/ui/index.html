@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>卫戍协议 · 服务器管理</title><link rel="stylesheet" href="/style.css"><script src="/app.js" defer></script></head>
+<body>
+<header><div><span class="eyebrow">STRONGHOLD / SERVER CONTROL</span><h1>服务器管理</h1></div><div class="header-actions"><span id="updated">独立管理端口</span><button id="logout" hidden>退出登录</button></div></header>
+<p id="message" role="status" aria-live="polite"></p>
+<main>
+<section id="login-card" class="login card"><span class="eyebrow">ADMIN ACCESS</span><h2>管理员登录</h2>
+<p>使用服务器管理员密码进入控制台。</p>
+<form id="login"><label>管理员密码<input id="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary" type="submit">登录后台</button></form></section>
+<div id="dashboard" hidden>
+<section class="metrics" id="metrics" aria-label="服务器负载"></section>
+<nav aria-label="管理功能"><button data-tab="players" class="active">在线玩家</button><button data-tab="rooms">房间管理</button><button data-tab="announcement">服务器公告</button><button data-tab="bans">封禁名单</button><button data-tab="audit">操作记录</button><button id="refresh">立即刷新</button></nav>
+<section id="players" class="card tab"><div class="section-head"><h2>玩家会话</h2><span id="player-count"></span></div><p class="muted">显示在线玩家与保留房间中的离线玩家。踢出允许重新连接；封禁阻止原身份重新进入。</p><div class="table-scroll"><table><thead><tr><th>玩家</th><th>状态</th><th>房间</th><th>IP 地址</th><th>最近活动</th><th>操作</th></tr></thead><tbody id="player-rows"></tbody></table></div></section>
+<section id="rooms" class="card tab" hidden><div class="section-head"><h2>房间状态</h2><span id="room-count"></span></div><div id="room-cards" class="room-grid"></div></section>
+<section id="announcement" class="card tab" hidden><div class="section-head"><h2>编辑服务器公告</h2><span id="publish-state"></span></div>
+<p class="muted">先保存草稿，再发布。玩家主页和服务器大厅每 30 秒更新一次；发布前只在后台可见。</p>
+<form id="announcement-form"><label>标题<input id="notice-title" maxlength="120" required></label><label>正文<textarea id="notice-body" rows="10" maxlength="12000" required></textarea></label><div class="actions"><button type="submit">保存草稿</button><button type="button" class="primary" id="publish">发布已保存草稿</button><button type="button" class="danger" id="unpublish">撤下公告</button></div></form>
+<h3>当前已发布内容</h3><article id="published-preview" class="preview"></article></section>
+<section id="bans" class="card tab" hidden><h2>封禁名单</h2><p class="muted">身份封禁关联浏览器重连身份。清除网站数据可产生新身份；IP 封禁还会影响同一公网 IP 下的其他玩家。</p><div class="table-scroll"><table><thead><tr><th>玩家</th><th>范围</th><th>原因</th><th>时间</th><th>操作</th></tr></thead><tbody id="ban-rows"></tbody></table></div></section>
+<section id="audit" class="card tab" hidden><h2>最近管理操作</h2><div id="audit-list"></div></section>
+</div>
+<dialog id="confirm-dialog"><form id="confirm-form"><h2 id="confirm-title"></h2><p id="confirm-text"></p><div id="ban-fields" hidden><label>封禁原因<input id="ban-reason" maxlength="300"></label><label class="checkbox"><input id="ban-ip" type="checkbox">同时封禁此 IP（会影响同 IP 的其他玩家）</label></div><div class="actions"><button type="button" id="cancel">取消</button><button type="submit" class="danger">确认操作</button></div></form></dialog>
+</main><footer>卫戍协议：盟约 · 服务器控制台<span>系统网速统计除回环外的网卡流量；磁盘统计游戏所在文件系统。</span></footer>
+</body></html>

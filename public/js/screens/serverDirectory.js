@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Icon, MicroLabel, Tabs, TextField, DifficultyTag, AvatarFrame, Spinner } from '../ui/components.js';
 import { LobbyHeader } from '../ui/lobbyHeader.js';
+import { ServerAnnouncement } from '../ui/serverAnnouncement.js';
 import { net } from '../net.js';
 import { useStore } from '../store.js';
 import { toastError } from '../ui/toasts.js';
@@ -130,6 +131,7 @@ export function ServerDirectory({ onCreate, onJoin, onMatch, onBack }) {
   return html`<div class="screen lobby-screen server-directory">
     <${LobbyHeader} title=${t('服务器大厅')} micro="SERVER LOBBY" onBack=${onBack} backTitle=${t('返回标题')} />
     <div class="server-body screen__scroll">
+      <${ServerAnnouncement} />
       <div class="server-overview__head">
         <div class="section-label"><span class="section-label__idx num">01</span>${t('服务器概况')}<${MicroLabel}>SERVER STATUS<//></div>
         <span class=${`server-live${error || !online ? ' is-stale' : ''}`} role="status"><i></i>${error ? t('更新失败，显示上次数据') : online ? t('已连接 · 每 3 秒自动更新') : t('正在连接服务器…')}</span>

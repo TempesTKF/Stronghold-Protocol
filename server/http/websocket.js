@@ -108,6 +108,7 @@ export function attachWebSocket(server, { network, log, traffic = null }) {
     };
     if (!parts || parts.rawPath !== '/ws') { reject(404, 'Not Found'); return; }
     const refused = network.admission(req);
+    if (refused === 'banned') { reject(403, 'Forbidden'); return; }
     if (refused === 'per-address') { reject(429, 'Too Many Requests'); return; }
     if (refused) { reject(503, 'Service Unavailable'); return; }
     if (narrowDeflateOffer(req.headers['sec-websocket-extensions'])) delete req.headers['sec-websocket-extensions'];

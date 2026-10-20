@@ -1369,7 +1369,7 @@
   "仅可通过四位同盟密钥或邀请链接加入 / 观战": "Join or spectate only with the four-character Alliance Key or an invite link",
   "允许匹配玩家、大厅加入和观战": "Allow matchmaking, joining and spectating from the lobby",
   "公开房间": "Public Room",
-"外观插件没有载入，显示原版素材": "The cosmetic plugins did not load; showing the original art",
+  "外观插件没有载入，显示原版素材": "The cosmetic plugins did not load; showing the original art",
   "本服务器安装了 {n} 个插件": "This server has {n} {n|plugin|plugins} installed",
   "「{a}」和「{b}」都改了 {path}（后者生效）": "“{a}” and “{b}” both change {path} (the latter applies)",
   "「{name}」适配 {app}，本服务器是 {version}（外观插件，仍可使用）": "“{name}” is made for {app}; this server is {version} (a cosmetic plugin: still usable)",
@@ -2248,6 +2248,7 @@
   "删除这台浏览器里、当前服务器版本已经用不到的导入素材；仍在使用的会保留。": "Delete the imported assets in this browser that this server's current version no longer uses; the ones still in use stay.",
   "已清理 {n} 个旧版本文件。": "Cleared {n} old-version files.",
   "没有需要清理的旧版本文件。": "No old-version files to clear.",
-  "读不到服务器的素材清单，没有删除任何文件。": "Could not read the server's asset lists; nothing was deleted."
-
+  "读不到服务器的素材清单，没有删除任何文件。": "Could not read the server's asset lists; nothing was deleted.",
+  "服务器公告": "Server announcement",
+  "管理员已关闭此同盟": "An administrator closed this alliance"
 }

@@ -36,6 +36,7 @@
 // The server only auto-listens when this file is the process entry point.
 
 import http from 'node:http';
+import { adminOptions, createAdmin } from './admin/index.js';
 import path from 'node:path';
 import { getData, loadData } from './data.js';
 import { ROOT, listenAddress, bindCandidates, serveDirs, makeLogger, parseTrustProxy, assetIndexOptionsFrom } from './http/config.js';
@@ -78,7 +79,7 @@ export {
  *   maxConnectionsPerAddr?: number, maxRoomsPerAddr?: number, maxMatchesPerAddr?: number, resyncMinGapMs?: number,
  *   heavyPerSec?: number, heavyBurst?: number, trustProxy?: 'auto' | boolean, soloReconnectWindowMs?: number,
  *   assetIndex?: boolean | { cacheFile?: string | null, delayMs?: number }, studio?: boolean,
- *   matchHost?: object,
+ *   matchHost?: object, admin?: false | { port?: number, host?: string, stateFile?: string, password: { salt: string, hash: string } },
  * }} [opts]
  *   assetIndex: the content-hash index (default on; false or SP_ASSET_INDEX=0: off — config.js assetIndexOptionsFrom);
  *   studio: the plugin studio at /studio/ (default on for this machine and the local network — SP_STUDIO=local|off;
@@ -138,13 +139,20 @@ export async function startServer(opts = {}) {
   buildTag();
 
   const traffic = createTrafficCounter();
-  const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health: { startedAt, network, registry, lobby, content, traffic, assetIndex, views, trusted:trustedRuntime?.health }, log, trustProxy: network.opts.trustProxy, studio, trustedRuntime }));
+  let admin = null;
+  const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health: { startedAt, network, registry, lobby, content, traffic, assetIndex, views, trusted:trustedRuntime?.health }, log, trustProxy: network.opts.trustProxy, studio, trustedRuntime,
+    announcements: () => admin?.state.public() || { announcement: null } }));
   server.on('clientError', answerClientError);
   const wss = attachWebSocket(server, { network, log, traffic });
 
   // The address actually bound. The default may fall back to IPv4; the returned host and url follow that.
   let boundHost;
   try {
+    const ownerOptions = adminOptions(ROOT, opts.admin);
+    if (ownerOptions) {
+      admin = createAdmin({ options: ownerOptions, root: ROOT, registry, lobby, network, startedAt, log });
+      network.blocked = admin.blocked;
+    }
     // A host with IPv6 switched off refuses '::'. Fall back to IPv4 rather than not booting. Only the default is
     // retried: an explicit HOST is literal (server/http/config.js bindCandidates).
     let bound = null;
@@ -182,11 +190,19 @@ export async function startServer(opts = {}) {
       lobby.trustedRuntime = null;
       await trustedRuntime?.close();
     }
+    if (admin) {
+      const address = await admin.listen();
+      log.info(`[admin] listening on ${address.address}:${address.port}`);
+    }
   } catch (e) {
     network.close(); // stop heartbeat/sweep timers of the half-built server
     assetIndex?.close();
     studio?.close();
     await trustedRuntime?.close();
+    await admin?.close();
+    if (server.listening) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+    try { wss.close(); } catch { /* startup failed */ }
+    hosts.close();
     throw e;
   }
   server.on('error', (e) => log.error('[http] server error', e));
@@ -206,6 +222,7 @@ export async function startServer(opts = {}) {
       assetIndex?.close();
       studio?.close();
       await trustedRuntime?.close();
+      await admin?.close();
       await new Promise((resolve) => {
         server.close(() => resolve());
         server.closeIdleConnections?.();
@@ -216,7 +233,7 @@ export async function startServer(opts = {}) {
     return closing;
   }
 
-  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, traffic, assetIndex, views, studio, close };
+  return { port: actualPort, host: boundHost, url, server, wss, lobby, network, registry, packs, content, visual, contents, hosts, traffic, assetIndex, views, studio, admin, close };
 }
 
 // `node server/index.js` / npm start: listen, print the banner, stop on SIGINT / SIGTERM (http/boot.js).

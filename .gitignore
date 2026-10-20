@@ -54,6 +54,7 @@ logs/
 scripts/service.env.cmd
 .env
 .env.*
+.admin/
 
 # --- OS / editor clutter ---------------------------------------------------------------------------
 .DS_Store

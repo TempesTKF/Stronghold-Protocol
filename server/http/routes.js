@@ -82,7 +82,7 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   plugin studio (server/studio/index.js), or none
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null }) {
+export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null, announcements = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
@@ -102,6 +102,10 @@ export function createRequestHandler({ serveStatic, health, log, trustProxy = 'a
     }
     if (parts.rawPath === '/api/lobby') {
       sendJson(req, res, 200, lobbyReport(health));
+      return;
+    }
+    if (parts.rawPath === '/api/announcement') {
+      sendJson(req, res, 200, announcements ? announcements() : { announcement: null });
       return;
     }
     await serveStatic(req, res, parts.rawPath, parts.query);

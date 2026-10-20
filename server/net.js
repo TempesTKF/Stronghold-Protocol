@@ -534,6 +534,8 @@ export class Network {
     /** @type {Map<string, number>} open sockets per client network key */
     this.connsPerKey = new Map();
     this.closed = false;
+    /** Optional owner moderation callback, installed by the separate admin listener. */
+    this.blocked = null;
     this.heartbeatTimer = setInterval(() => this.heartbeat(), this.opts.heartbeatMs);
     this.heartbeatTimer.unref?.();
     const sweepMs = Math.max(20, Math.min(15_000, Math.floor(this.opts.reconnectWindowMs / 4)));
@@ -547,10 +549,11 @@ export class Network {
   /**
    * Upgrade-time admission check (server/http/websocket.js): null to accept, otherwise the reason to refuse.
    * @param {import('node:http').IncomingMessage} req
-   * @returns {null | 'shutdown' | 'full' | 'per-address'}
+   * @returns {null | 'shutdown' | 'full' | 'per-address' | 'banned'}
    */
   admission(req) {
     if (this.closed) return 'shutdown';
+    if (this.blocked?.(null, clientAddress(req, this.opts.trustProxy).ip)) return 'banned';
     if (this.conns.size >= this.opts.maxConnections) return 'full';
     const { key } = clientAddress(req, this.opts.trustProxy);
     const cap = this.opts.maxConnectionsPerAddr;
@@ -663,6 +666,10 @@ export class Network {
   /** @param {Connection} conn @param {any} msg @param {number} now */
   onHelloMsg(conn, msg, now) {
     const rid = msg.rid;
+    if (this.blocked?.(conn.session?.token || msg.token, conn.ip)) {
+      conn.close(CLOSE.POLICY, 'banned by administrator');
+      return;
+    }
     if (msg.version != null && msg.version !== PROTOCOL_VERSION) {
       this.reply(conn, errorMsg(ERR.BAD_MSG, rid, `version mismatch: server ${PROTOCOL_VERSION}`));
       return;

@@ -39,6 +39,7 @@ import { GIcon } from '../ui/gameComponents.js';
 import { SettingsModal } from '../ui/settings.js';
 import { installedCount } from '../content.js';
 import { NoticesButton } from '../ui/notices.js';
+import { ServerAnnouncement } from '../ui/serverAnnouncement.js';
 import { sanitizeName, isValidName } from '../ui/playerName.js';
 
 export { stripLoneSurrogates, sanitizeName, isValidName } from '../ui/playerName.js';
@@ -276,6 +277,7 @@ export function TitleScreen() {
     <${SettingsModal} open=${settingsOpen} onClose=${() => setSettingsOpen(false)} />
     ${Installed ? html`<${Installed} open=${true} onClose=${() => setInstalled(null)} />` : null}
 
+    <${ServerAnnouncement} />
     <footer class="title-foot">
       <${ResumeMatchButton} />
       <${PwaInstallButton} />
