@@ -40,7 +40,7 @@
     <string name="remote_note">游戏中按返回键可以调出「切换模式 / 服务器」与「退出」。</string>
 
     <string name="content_title">素材与皮肤</string>
-    <string name="content_desc">皮肤是可选内容：把皮肤包（插件 zip，例如 official-operator-skins.zip）放进手机，在这里导入，再到游戏的 设置 → 外观插件 里打开。安装包没带素材时，也可以在这里导入素材包（上游完整发布包 Stronghold-Protocol-v版本.zip 可以原样导入，连 3D 战场和官方特效一起）。导入的内容只供个人使用。</string>
+    <string name="content_desc">皮肤是可选内容：下载皮肤包（插件 zip，例如 official-operator-skins.zip，不用解压）后，在浏览器的下载列表或文件管理器里点它、选「卫戍协议」打开，就会直接导入；也可以点下面的按钮从「下载」里选。导入后到游戏的 设置 → 外观插件 里打开。安装包没带素材时，也可以在这里导入素材包（上游完整发布包 Stronghold-Protocol-v版本.zip 可以原样导入，连 3D 战场和官方特效一起）。导入的内容只供个人使用。</string>
     <string name="content_import">导入素材包 / 皮肤包</string>
     <string name="content_clear">清除已导入</string>
     <string name="content_none">尚未导入素材或皮肤。</string>

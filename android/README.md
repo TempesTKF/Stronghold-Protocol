@@ -80,7 +80,10 @@ bash android/tools/pack-assets.sh                # 可选：素材包 → androi
   带 AI 队友的同盟房间按服务器的托管规则继续进行。服务器进程被结束（通知上点「停止」、系统强杀、
   重启手机、升级 APK）后对局不会保留——服务端本身不落盘对局状态。
 - **素材包与皮肤包单独导入**（`ContentStore`）：APK 只带游戏本体。首页「素材与皮肤 → 导入素材包 / 皮肤包」
-  用系统文件选择器选手机里的 zip，流式解到 `filesDir/content/{assets,fonts,plugins/<id>}`——放在游戏目录
+  用系统文件选择器选手机里的 zip（选择器默认从「下载」目录打开），或者在浏览器的下载列表 / 文件管理器里点 zip、
+  选「卫戍协议」打开（离线版清单里的 `ACTION_VIEW` + `application/zip`，只认 `content://`；`build.sh` 只在
+  `MODE=offline` 时把 `OFFLINE_ZIP_FILTER` 那行换成这个 intent filter，联机版没有导入、不出现在「打开方式」里），
+  App 回到首页直接导入。都不需要存储权限。zip 流式解到 `filesDir/content/{assets,fonts,plugins/<id>}`——放在游戏目录
   外面，APK 升级重新解压游戏目录时不受影响；再用软链接进 `game/public/assets`、`game/public/fonts`、
   `game/plugins/<id>`（每次开服前与导入后各链一次，幂等；删除游戏目录时只删链接不进去）。一个 zip 里按路径
   分两类：`assets/…`、`fonts/…`（可带 `public/` 或 `<一层>/public/` 前缀）是素材，逐文件并入；带

@@ -107,6 +107,24 @@ public final class BuildMode {
 JAVA
 fi
 
+# 清单：离线版把 OFFLINE_ZIP_FILTER 那一行换成 zip 的打开方式（在下载列表 / 文件管理器里点 zip →「卫戍协议」→ 导入）；
+# 联机版原样去掉这行注释。只认 content:// —— Android 7+ 不允许跨应用传 file://。
+MANIFEST="$OUT/AndroidManifest.xml"
+mkdir -p "$OUT"
+if [ "$MODE" = offline ]; then
+  awk '/OFFLINE_ZIP_FILTER/ {
+    print "            <intent-filter>"
+    print "                <action android:name=\"android.intent.action.VIEW\" />"
+    print "                <category android:name=\"android.intent.category.DEFAULT\" />"
+    print "                <data android:scheme=\"content\" />"
+    print "                <data android:mimeType=\"application/zip\" />"
+    print "                <data android:mimeType=\"application/x-zip-compressed\" />"
+    print "            </intent-filter>"
+    next } { print }' "$HERE/app/src/main/AndroidManifest.xml" > "$MANIFEST"
+else
+  grep -v "OFFLINE_ZIP_FILTER" "$HERE/app/src/main/AndroidManifest.xml" > "$MANIFEST"
+fi
+
 rm -rf "$OUT/res.zip" "$OUT/base.apk" "$OUT/aligned.apk" "$OUT/dex" "$OUT/classes" "$OUT/gen"
 mkdir -p "$OUT/gen" "$OUT/classes" "$OUT/dex"
 
@@ -126,7 +144,7 @@ NOSTORE=(--no-compress-regex '\.(png|jpe?g|webp|mp3|ogg|wav|skel|atlas|otf|ttf|w
 "$BT/aapt2" link \
   -o "$OUT_WIN/base.apk" \
   -I "$PLATFORM_JAR" \
-  --manifest "$HERE_WIN/app/src/main/AndroidManifest.xml" \
+  --manifest "$(win "$MANIFEST")" \
   --rename-manifest-package "$PKG" \
   --custom-package app.stronghold.shell \
   "${ASSETS[@]}" \

@@ -81,6 +81,8 @@ public final class MainActivity extends Activity {
                 + " runtime=" + LocalRuntime.runtimePresent(this)
                 + " bundled=" + LocalRuntime.gameBundled(this)
                 + " dir=" + getApplicationInfo().nativeLibraryDir);
+        // 从外部点 zip 打开：先去首页导入，不自动开服或连服务器
+        if (handleOpenIntent(getIntent())) return;
         // 离线版第一次打开（或上次本地开服失败）先停在首页，让玩家选本地离线还是联机；之后直接进上次的模式
         if (mode == null && BuildMode.OFFLINE) {
             showSetup("");
@@ -352,7 +354,11 @@ public final class MainActivity extends Activity {
                 .addCategory(Intent.CATEGORY_OPENABLE)
                 .setType("*/*")
                 .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"application/zip", "application/x-zip-compressed",
-                        "application/octet-stream"});
+                        "application/octet-stream"})
+                // 浏览器下载的 zip 都在「下载」里：选择器直接从那里打开（只是起始位置，系统不支持时忽略）
+                .putExtra(android.provider.DocumentsContract.EXTRA_INITIAL_URI,
+                        android.provider.DocumentsContract.buildDocumentUri(
+                                "com.android.externalstorage.documents", "primary:Download"));
         startActivityForResult(intent, REQUEST_IMPORT);
     }
 
@@ -361,7 +367,37 @@ public final class MainActivity extends Activity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode != REQUEST_IMPORT || resultCode != RESULT_OK || data == null || data.getData() == null) return;
-        final Uri uri = data.getData();
+        importContent(data.getData());
+    }
+
+    /**
+     * 在下载列表或文件管理器里点 zip、选「卫戍协议」打开（离线版清单里的 ACTION_VIEW，build.sh 只给离线版加）：
+     * 回到首页并直接导入，不用再在选择器里找文件。读这个 URI 的临时授权跟着这次 Intent，导入立刻开始。
+     */
+    private boolean handleOpenIntent(Intent intent) {
+        if (!BuildMode.OFFLINE || intent == null || !Intent.ACTION_VIEW.equals(intent.getAction())
+                || intent.getData() == null) {
+            return false;
+        }
+        Uri uri = intent.getData();
+        intent.setData(null);   // 已处理：界面重建（旋转等）时不再导入一次
+        showSetup("");
+        if (importing) {
+            showContentSummary(getString(R.string.content_busy));
+        } else {
+            importContent(uri);
+        }
+        return true;
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleOpenIntent(intent);
+    }
+
+    private void importContent(final Uri uri) {
         importing = true;
         setContentButtonsEnabled(false);
         showContentSummary(getString(R.string.content_importing, ContentStore.displayName(this, uri)));

@@ -37,6 +37,7 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- OFFLINE_ZIP_FILTER：MODE=offline 时 build.sh 把这一行换成 zip 的打开方式（导入素材包 / 皮肤包）；联机版没有导入，不出现在「打开方式」里 -->
         </activity>
 
         <service
