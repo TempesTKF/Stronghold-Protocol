@@ -4,15 +4,16 @@
 # 打成一个 zip 而不是目录树，是因为 Android 的 AssetManager.list() 数不出压缩的 assets，
 # 而单个 zip 只要 open() 一个流就能读，解压也快得多。
 #
-#   bash android/tools/stage-game.sh              # 含素材（约 550MB，离线版出货用）
-#   bash android/tools/stage-game.sh --no-assets  # 不含素材（约 9MB，只跑通流程用）
+#   bash android/tools/stage-game.sh                # 不含素材（约 9MB）：素材与皮肤在手机上单独导入（默认）
+#   bash android/tools/stage-game.sh --with-assets  # 把 public/assets、public/fonts 也打进 APK（约 +720MB）
 #   bash android/tools/stage-game.sh --plugins <目录>   # 另外带上 <目录> 下的插件（可重复）
 #
 # --plugins：<目录> 本身或它的每个子目录只要有 plugin.json，就按原名复制进游戏目录的 plugins/
 # （服务器启动时自己扫描、校验；外观插件在 设置 → 插件 里由玩家自己打开）。
 # 例：TKF v0.3.1 的皮肤素材包 official-operator-skins.zip 解开后有 4 个插件文件夹，把解开的目录传进来即可。
 #
-# 前置：仓库根跑过 npm install（要有服务端依赖与 public/vendor）与 npm run setup（要有 public/assets、public/fonts）。
+# 前置：仓库根跑过 npm install（要有服务端依赖与 public/vendor）；--with-assets 还要 npm run setup（public/assets、public/fonts）。
+# 在手机上单独导入用的素材包由 android/tools/pack-assets.sh 生成。
 #
 # 收拢的是 server/index.js 运行时实际读到的全部（0.3.1 起比最初的清单多了 plugins / schemas / tools 与 ses、acorn）：
 #   server shared data packs public package.json  服务端、共享代码、数据、语言包、浏览器客户端
@@ -30,11 +31,12 @@ ASSETS_DIR="$ANDROID_DIR/app/src/main/assets"
 STAGE="$ANDROID_DIR/build/stage-game"
 ZIP="$ASSETS_DIR/game.zip"
 
-WITH_ASSETS=1
+WITH_ASSETS=0
 EXTRA_PLUGINS=()
 while [ "$#" -gt 0 ]; do
   case "$1" in
-    --no-assets) WITH_ASSETS=0; shift ;;
+    --with-assets) WITH_ASSETS=1; shift ;;
+    --no-assets) WITH_ASSETS=0; shift ;;   # 旧参数，现在就是默认
     --plugins)
       [ -n "${2:-}" ] && [ -d "$2" ] || { echo "--plugins 后面要跟一个存在的目录" >&2; exit 1; }
       if [ -f "$2/plugin.json" ]; then
@@ -45,7 +47,7 @@ while [ "$#" -gt 0 ]; do
         done
       fi
       shift 2 ;;
-    *) echo "未知参数：$1（可用 --no-assets、--plugins <目录>）" >&2; exit 1 ;;
+    *) echo "未知参数：$1（可用 --with-assets、--plugins <目录>）" >&2; exit 1 ;;
   esac
 done
 
@@ -95,6 +97,16 @@ done
 rm -rf "$STAGE" "$ASSETS_DIR/game" "$ZIP"
 mkdir -p "$STAGE/node_modules" "$ASSETS_DIR"
 for item in "${ITEMS[@]}"; do
+  if [ "$item" = public ] && [ "$WITH_ASSETS" = 0 ]; then
+    # 不带素材时连复制都跳过 public/assets、public/fonts（约 720MB）
+    mkdir -p "$STAGE/public"
+    for child in "$REPO/public"/* "$REPO/public"/.[!.]*; do
+      [ -e "$child" ] || continue
+      case "$(basename "$child")" in assets|fonts) continue ;; esac
+      cp -rL "$child" "$STAGE/public/"
+    done
+    continue
+  fi
   cp -rL "$REPO/$item" "$STAGE/"
 done
 for dep in $DEPS; do
@@ -117,8 +129,7 @@ for dir in "${EXTRA_PLUGINS[@]+"${EXTRA_PLUGINS[@]}"}"; do
 done
 
 if [ "$WITH_ASSETS" = 0 ]; then
-  rm -rf "$STAGE/public/assets" "$STAGE/public/fonts"
-  echo "（--no-assets：已去掉 public/assets 与 public/fonts）"
+  echo "（不含 public/assets 与 public/fonts：在手机上导入素材包，见 android/tools/pack-assets.sh）"
 fi
 
 echo "打包中…（$STAGE → $ZIP）"

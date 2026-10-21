@@ -46,6 +46,12 @@ public final class MainActivity extends Activity {
     private static final String KEY_URL = "serverUrl";
     private static final String KEY_MODE = "mode";
     private static final int LOCAL_PORT = 3000;
+    private static final int REQUEST_IMPORT = 2;
+
+    /** 首页「素材与皮肤」的状态行与按钮（首页每次重建都重新取）；导入在后台线程，期间禁用按钮。 */
+    private TextView contentStatus;
+    private View[] contentButtons;
+    private boolean importing;
 
     private FrameLayout root;
     private WebView web;
@@ -71,11 +77,15 @@ public final class MainActivity extends Activity {
 
         SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
         String mode = prefs.getString(KEY_MODE, null);
-        if (mode == null) mode = BuildMode.OFFLINE ? "local" : "remote";
         Log.i(TAG, "start: offline=" + BuildMode.OFFLINE + " mode=" + mode
                 + " runtime=" + LocalRuntime.runtimePresent(this)
                 + " bundled=" + LocalRuntime.gameBundled(this)
                 + " dir=" + getApplicationInfo().nativeLibraryDir);
+        // 离线版第一次打开（或上次本地开服失败）先停在首页，让玩家选本地离线还是联机；之后直接进上次的模式
+        if (mode == null && BuildMode.OFFLINE) {
+            showSetup("");
+            return;
+        }
         if ("local".equals(mode) && LocalRuntime.available(this)) {
             startLocal();
         } else {
@@ -148,10 +158,12 @@ public final class MainActivity extends Activity {
             try {
                 if (LocalRuntime.healthy(LOCAL_PORT)) {
                     Log.i(TAG, "local server already running");
+                    ContentStore.link(this);   // 运行中导入过的内容也链上（服务器按文件读，不用重启）
                 } else {
                     new LocalRuntime().prepare(this, message -> runOnUiThread(() -> {
                         if (!isFinishing()) showMessage(message);
                     }));
+                    ContentStore.link(this);   // 导入的素材与插件链进游戏目录（APK 不带它们）
                     runOnUiThread(() -> {
                         if (!isFinishing()) showMessage(getString(R.string.local_starting));
                     });
@@ -309,7 +321,106 @@ public final class MainActivity extends Activity {
         } else {
             localRow.setVisibility(View.GONE);
         }
+
+        // 素材与皮肤：离线版单独导入（ContentStore），联机版用服务器提供的，不需要
+        View contentRow = view.findViewById(R.id.setup_content_row);
+        if (BuildMode.OFFLINE) {
+            contentRow.setVisibility(View.VISIBLE);
+            contentStatus = view.findViewById(R.id.setup_content_status);
+            contentButtons = new View[] {view.findViewById(R.id.setup_import), view.findViewById(R.id.setup_clear)};
+            contentButtons[0].setOnClickListener(b -> pickContent());
+            contentButtons[1].setOnClickListener(b -> new AlertDialog.Builder(this)
+                    .setTitle(R.string.content_clear_title)
+                    .setMessage(R.string.content_clear_msg)
+                    .setPositiveButton(R.string.content_clear_ok, (d, w) -> clearContent())
+                    .setNegativeButton(R.string.dialog_cancel, null)
+                    .show());
+            showContentSummary(importing ? getString(R.string.content_busy) : null);
+        } else {
+            contentRow.setVisibility(View.GONE);
+            contentStatus = null;
+            contentButtons = null;
+        }
         applyImmersive();
+    }
+
+    // ---- 素材包 / 皮肤包导入 ---------------------------------------------------------------------------------------
+
+    private void pickContent() {
+        if (importing) return;
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*")
+                .putExtra(Intent.EXTRA_MIME_TYPES, new String[] {"application/zip", "application/x-zip-compressed",
+                        "application/octet-stream"});
+        startActivityForResult(intent, REQUEST_IMPORT);
+    }
+
+    @Override
+    @SuppressWarnings("deprecation")
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_IMPORT || resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        final Uri uri = data.getData();
+        importing = true;
+        setContentButtonsEnabled(false);
+        showContentSummary(getString(R.string.content_importing, ContentStore.displayName(this, uri)));
+        new Thread(() -> {
+            String message;
+            try {
+                ContentStore.Result result = ContentStore.importZip(this, uri, written -> runOnUiThread(
+                        () -> showContentSummary(getString(R.string.content_progress, written))));
+                ContentStore.link(this);   // 本机服务器在跑也行：素材按文件读，插件目录变化服务器自己会重新扫描
+                message = result.empty() ? getString(R.string.content_empty)
+                        : getString(R.string.content_done, result.artFiles, result.plugins.isEmpty()
+                                ? getString(R.string.content_no_plugins) : android.text.TextUtils.join("、", result.plugins));
+            } catch (ContentStore.NoSpace e) {
+                message = getString(R.string.content_no_space, mb(e.need), mb(e.free));
+            } catch (Exception e) {
+                Log.w(TAG, "import failed", e);
+                message = getString(R.string.content_failed, e.getMessage() == null ? e.toString() : e.getMessage());
+            }
+            final String done = message;
+            runOnUiThread(() -> {
+                importing = false;
+                setContentButtonsEnabled(true);
+                showContentSummary(done);
+            });
+        }, "import").start();
+    }
+
+    private void clearContent() {
+        if (importing) return;
+        importing = true;
+        setContentButtonsEnabled(false);
+        new Thread(() -> {
+            ContentStore.clear(this);
+            runOnUiThread(() -> {
+                importing = false;
+                setContentButtonsEnabled(true);
+                showContentSummary(getString(R.string.content_cleared));
+            });
+        }, "clear").start();
+    }
+
+    /** 首页「素材与皮肤」的状态行：已导入的内容，下面一行是最近一次操作的结果。 */
+    private void showContentSummary(String note) {
+        if (contentStatus == null) return;
+        int art = ContentStore.artFiles(this);
+        java.util.List<String> plugins = ContentStore.plugins(this);
+        String summary = art == 0 && plugins.isEmpty() ? getString(R.string.content_none)
+                : getString(R.string.content_summary, art,
+                        plugins.isEmpty() ? getString(R.string.content_no_plugins) : android.text.TextUtils.join("、", plugins));
+        contentStatus.setText(note == null || note.isEmpty() ? summary : summary + "\n" + note);
+    }
+
+    private void setContentButtonsEnabled(boolean enabled) {
+        if (contentButtons == null) return;
+        for (View button : contentButtons) button.setEnabled(enabled);
+    }
+
+    private static String mb(long bytes) {
+        return (bytes >> 20) + " MB";
     }
 
     /** 主框架加载失败、或地址不是游戏服务器时显示的页面。force 时额外给出「仍然打开」。 */

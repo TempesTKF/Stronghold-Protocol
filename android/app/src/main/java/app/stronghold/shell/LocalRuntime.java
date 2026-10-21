@@ -247,7 +247,9 @@ final class LocalRuntime {
         }
     }
 
-    private static boolean deleteTree(File file) {
+    /** 删除目录树；软链只删链接本身，不进去——游戏目录里链着导入的素材与插件（{@link ContentStore}）。 */
+    static boolean deleteTree(File file) {
+        if (java.nio.file.Files.isSymbolicLink(file.toPath())) return file.delete();
         File[] children = file.listFiles();
         boolean ok = true;
         if (children != null) {

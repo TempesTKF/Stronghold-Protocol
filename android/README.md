@@ -8,9 +8,9 @@
 | | 联机版（默认） | 离线版 |
 |---|---|---|
 | 构建 | `bash android/build.sh` | `MODE=offline bash android/build.sh` |
-| APK | 约 25 KB | 约 620 MB（含 550MB 素材）或约 60 MB（`--no-assets`） |
+| APK | 约 25 KB | 约 45 MB（不含素材；素材包、皮肤包在手机上单独导入） |
 | 包名 | `app.stronghold.shell` | `app.stronghold.shell.offline`（可与联机版共存） |
-| 默认 | 连 `default_server`（`res/values/strings.xml`） | 手机本地开服（内置 Node 运行时 + 游戏文件），不需要网络 |
+| 默认 | 连 `default_server`（`res/values/strings.xml`） | 首次打开停在首页选「本地离线」或「联机」，之后进上次的模式 |
 | 也能 | 切换服务器 | 切换服务器 |
 
 ## 为什么这样切
@@ -45,8 +45,9 @@ major×10000 + minor×100 + patch，如 `0.2.6` → `206`；离线版版本名�
 
 ```bash
 bash android/tools/stage-runtime.sh              # 取 Termux 的 node 与依赖库 → android/runtimes/<abi>/
-bash android/tools/stage-game.sh                 # 收拢游戏文件（含素材）→ android/app/src/main/assets/game.zip
+bash android/tools/stage-game.sh                 # 收拢游戏文件（不含素材）→ android/app/src/main/assets/game.zip
 MODE=offline bash android/build.sh               # → android/build/stronghold-offline-arm64-v8a-debug.apk
+bash android/tools/pack-assets.sh                # 可选：素材包 → android/build/stronghold-assets-<版本>.zip（手机上导入）
 ```
 
 - **运行时**（`android/tools/stage-runtime.sh`）：从 Termux 镜像取 `nodejs-lts`（现为 **Node 24.18.0**）
@@ -76,10 +77,20 @@ MODE=offline bash android/build.sh               # → android/build/stronghold-
   `soloReconnectWindowMs`（24 小时）都拉到 20 天，不改 `server/` 代码。单人对局在离开期间停着等；
   带 AI 队友的同盟房间按服务器的托管规则继续进行。服务器进程被结束（通知上点「停止」、系统强杀、
   重启手机、升级 APK）后对局不会保留——服务端本身不落盘对局状态。
-- **皮肤等插件**：`stage-game.sh --plugins <目录>` 把目录下带 `plugin.json` 的插件文件夹一起打进游戏目录的
-  `plugins/`（不跟随软链）。TKF v0.3.1 发布的皮肤素材包 `official-operator-skins.zip`（404MB，4 个外观插件、
-  274 套皮肤）解开后传入即可；服务器启动时照常扫描、校验 `plugin.lock.json`，玩家在设置里自己打开。
-  这些是官方美术，离线包只供个人使用。
+- **素材包与皮肤包单独导入**（`ContentStore`）：APK 只带游戏本体。首页「素材与皮肤 → 导入素材包 / 皮肤包」
+  用系统文件选择器选手机里的 zip，流式解到 `filesDir/content/{assets,fonts,plugins/<id>}`——放在游戏目录
+  外面，APK 升级重新解压游戏目录时不受影响；再用软链接进 `game/public/assets`、`game/public/fonts`、
+  `game/plugins/<id>`（每次开服前与导入后各链一次，幂等；删除游戏目录时只删链接不进去）。一个 zip 里按路径
+  分两类：`assets/…`、`fonts/…`（可带 `public/` 或 `<一层>/public/` 前缀）是素材，逐文件并入；带
+  `plugin.json` 的顶层文件夹是插件，整个替换同名旧版。条目先解到 `content/.incoming` 全部写完再移到位，
+  绝对路径、`..` 与解析后跳出暂存目录的条目整包拒绝；导入前按 zip 大小检查剩余空间。本机服务器在运行时
+  也能导入：素材按文件读，插件目录变化服务器自己会重新扫描（桌面上用目录联接模拟验证过）。
+  - 素材包：`android/tools/pack-assets.sh` 把 `public/assets` + `public/fonts` 打成不压缩的 zip（要和 APK
+    同一版本：`data/assets.json` 在 APK 里）。不导入也能玩，画面用默认图形。
+  - 皮肤包：TKF v0.3.1 发布的 `official-operator-skins.zip`（404MB，4 个外观插件、274 套皮肤）原样导入即可；
+    玩家在游戏的 设置 → 外观插件 里打开。
+  - 「清除已导入」删掉 `content/` 并拆掉链接。这些都是官方美术，只供个人使用，不要分发。
+  - 想把插件直接打进 APK 也行：`stage-game.sh --plugins <目录>`（不跟随软链）；`--with-assets` 把素材打进 APK。
 - **隐藏网页端才有用的控件**：外壳在页面加载时注入一个 `<style>`（`MainActivity.injectShellStyle`），不改
   `public/`。`res/raw/shell.css` 两个构建都注入：全屏切换按钮（外壳本来就是沉浸式全屏）。
   `res/raw/shell_local.css` 只在本地模式注入：延迟显示、服务器大厅的统计与公开房间列表、匹配房间、
@@ -97,8 +108,11 @@ MODE=offline bash android/build.sh               # → android/build/stronghold-
 adb install -r android/build/stronghold-shell-debug.apk
 ```
 
-首次启动：联机版直接进 `default_server`；离线版先解压内置素材（十几秒到一分钟）再进游戏。游戏内
-**返回键**弹出「切换服务器 / 退出」；设置页可以改地址、恢复默认，离线版还多一个「本地模式」按钮。
+首次启动：联机版直接进 `default_server`；离线版停在首页，三块——**本地离线**（手机自己开服）、
+**联机**（填服务器地址，和用浏览器玩的博士进同一批房间；页面由那台服务器提供，与网页端完全一样，
+只隐藏了全屏按钮）、**素材与皮肤**（导入 / 清除）。之后每次打开直接进上次的模式。游戏内
+**返回键**弹出「切换模式 / 服务器」与「退出」，前者回到首页。从本地切到联机时本机服务器继续在后台跑，
+切回来还能接着打原来的对局。
 局域网 http 需要明文流量（清单已开 `usesCleartextTraffic`）；debug 构建开着
 `WebView.setWebContentsDebuggingEnabled`，可用 Chrome 的 `chrome://inspect` 远程调试。
 
