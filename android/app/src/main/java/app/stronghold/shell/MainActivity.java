@@ -35,7 +35,7 @@ import org.json.JSONObject;
  * 单 Activity 外壳：沉浸式横屏 WebView 加载客户端。
  *
  * 两种来源，由 {@link BuildMode} 决定首次启动用哪个：
- *   联机版：默认连 default_server（客户端与素材由服务器分发，版本天然一致）。
+ *   联机版：连玩家填的服务器（不内置默认地址；客户端与素材由服务器分发，版本天然一致）。
  *   离线版：默认本地开服（内置 Node 运行时与游戏文件，见 {@link LocalRuntime}），也能切去连服务器。
  * 两者都实现 WebChromeClient.onShowCustomView 对接游戏的全屏按钮，并在连接前先探测 /healthz。
  */
@@ -88,9 +88,14 @@ public final class MainActivity extends Activity {
         }
         if ("local".equals(mode) && LocalRuntime.available(this)) {
             startLocal();
+            return;
+        }
+        // 不内置默认服务器：连过的话直接连上次的地址，否则停在首页让玩家自己填
+        String saved = prefs.getString(KEY_URL, null);
+        if (saved == null || saved.isEmpty()) {
+            showSetup("");
         } else {
-            String saved = prefs.getString(KEY_URL, null);
-            loadRemote(saved == null || saved.isEmpty() ? defaultServer() : saved);
+            loadRemote(saved);
         }
     }
 
@@ -134,12 +139,6 @@ public final class MainActivity extends Activity {
     }
 
     // ---- 两种来源 --------------------------------------------------------------------------------------------------
-
-    /** 默认服务器：res/values/strings.xml 的 default_server（可以不带协议）。 */
-    private String defaultServer() {
-        String url = normalize(getString(R.string.default_server));
-        return url != null ? url : "http://127.0.0.1:3000";
-    }
 
     /**
      * 离线版：解压内置游戏文件 → 启动本机服务器（前台服务 {@link LocalServerService}）→ 加载 127.0.0.1。
@@ -299,7 +298,10 @@ public final class MainActivity extends Activity {
 
         final EditText input = view.findViewById(R.id.setup_url);
         final TextView statusView = view.findViewById(R.id.setup_status);
-        input.setText(stripScheme(currentUrl != null ? currentUrl : defaultServer()));
+        // 只回填玩家自己连过的地址；没连过就留空（显示灰色示例），不内置默认服务器
+        String last = currentUrl != null ? currentUrl
+                : getSharedPreferences(PREFS, MODE_PRIVATE).getString(KEY_URL, null);
+        input.setText(stripScheme(last));
         statusView.setText(status == null ? "" : status);
 
         view.findViewById(R.id.setup_connect).setOnClickListener(b -> {
@@ -311,8 +313,6 @@ public final class MainActivity extends Activity {
             statusView.setText(getString(R.string.setup_connecting, url));
             loadRemote(url);
         });
-        view.findViewById(R.id.setup_reset).setOnClickListener(
-                b -> input.setText(stripScheme(defaultServer())));
 
         View localRow = view.findViewById(R.id.setup_local_row);
         if (LocalRuntime.available(this)) {

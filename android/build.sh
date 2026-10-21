@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # 构建 Android 外壳的 debug APK（把这个仓库的浏览器客户端装进 WebView）。
 #
-#   bash android/build.sh                     # 联机版：默认连 default_server，APK 约 25KB
+#   bash android/build.sh                     # 联机版：连玩家填的服务器，APK 约 46KB
 #   MODE=offline bash android/build.sh        # 离线版：内置 Node 运行时与游戏文件，默认本地开服
 #   MODE=offline ABI=x86_64 bash android/build.sh   # 换 ABI（线上出货用 arm64-v8a）
 #

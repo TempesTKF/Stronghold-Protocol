@@ -117,14 +117,6 @@
                 android:layout_height="wrap_content"
                 android:minWidth="140dp"
                 android:text="@string/setup_connect" />
-
-            <Button
-                android:id="@+id/setup_reset"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
-                android:minWidth="140dp"
-                android:text="@string/setup_reset" />
         </LinearLayout>
 
         <!-- 素材与皮肤（只有离线版显示）：素材包、皮肤包单独导入，不在 APK 里 -->

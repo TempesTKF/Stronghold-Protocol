@@ -2,15 +2,11 @@
 <resources>
     <string name="app_name">卫戍协议</string>
 
-    <!-- 默认连接的服务器。换默认值只改这一行（可不带 http://）。 -->
-    <string name="default_server">103.236.99.216:50069</string>
-
     <string name="setup_home_title">卫戍协议</string>
     <string name="setup_title">联机</string>
-    <string name="setup_desc">连到游戏服务器，和用浏览器玩的博士进同一批房间（界面和网页端一样，由服务器提供）。默认是我们的服务器；要连别的服务器（例如同一 Wi-Fi 下开服电脑的局域网 IP），把地址改成对应的 主机:端口。</string>
+    <string name="setup_desc">连到游戏服务器，和用浏览器玩的博士进同一批房间（界面和网页端一样，由服务器提供）。填服务器的 主机:端口（例如同一 Wi-Fi 下开服电脑的局域网 IP），或 https:// 开头的地址；连过一次之后会记住。</string>
     <string name="setup_hint">192.168.1.5:3000</string>
     <string name="setup_connect">连接</string>
-    <string name="setup_reset">恢复默认</string>
     <string name="setup_bad_url">地址无法识别，请检查后重试。</string>
     <string name="setup_connecting">正在连接 %1$s …</string>
 
