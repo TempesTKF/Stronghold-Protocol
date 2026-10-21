@@ -8,7 +8,7 @@
 | | 联机版（默认） | 离线版 |
 |---|---|---|
 | 构建 | `bash android/build.sh` | `MODE=offline bash android/build.sh` |
-| APK | 约 25 KB | 约 45 MB（不含素材；素材包、皮肤包在手机上单独导入） |
+| APK | 约 25 KB | 自带全部素材约 1.1 GB（`--assets-from`，含 3D 战场与官方特效）；不带素材约 45 MB。皮肤包都在手机上单独导入 |
 | 包名 | `app.stronghold.shell` | `app.stronghold.shell.offline`（可与联机版共存） |
 | 默认 | 连 `default_server`（`res/values/strings.xml`） | 首次打开停在首页选「本地离线」或「联机」，之后进上次的模式 |
 | 也能 | 切换服务器 | 切换服务器 |
@@ -45,7 +45,9 @@ major×10000 + minor×100 + patch，如 `0.2.6` → `206`；离线版版本名�
 
 ```bash
 bash android/tools/stage-runtime.sh              # 取 Termux 的 node 与依赖库 → android/runtimes/<abi>/
-bash android/tools/stage-game.sh                 # 收拢游戏文件（不含素材）→ android/app/src/main/assets/game.zip
+bash android/tools/stage-game.sh --assets-from <解开的 Stronghold-Protocol-v<版本>.zip 根目录>
+                                                 # 收拢游戏文件 + 全部素材 → android/app/src/main/assets/game.zip
+                                                 # （不加 --assets-from 就是不带素材的小包，素材在手机上导入）
 MODE=offline bash android/build.sh               # → android/build/stronghold-offline-arm64-v8a-debug.apk
 bash android/tools/pack-assets.sh                # 可选：素材包 → android/build/stronghold-assets-<版本>.zip（手机上导入）
 ```
@@ -93,6 +95,8 @@ bash android/tools/pack-assets.sh                # 可选：素材包 → androi
     下的同名文件。包里的代码、文档、依赖不要，暂存后丢弃。lite 包与 update 包不含素材。
   - 皮肤包：TKF v0.3.1 发布的 `official-operator-skins.zip`（404MB，4 个外观插件、274 套皮肤）原样导入即可；
     玩家在游戏的 设置 → 外观插件 里打开。
+  - APK 自带素材时（`--assets-from` / `--with-assets`），游戏目录里的 `public/assets` 等是真实目录，导入的素材
+    不会链进去（链接只在没有同名真实目录时建立）；这种构建只需要导入皮肤包。
   - 「清除已导入」删掉 `content/` 并拆掉链接。这些都是官方美术，只供个人使用，不要分发。
   - 想把插件直接打进 APK 也行：`stage-game.sh --plugins <目录>`（不跟随软链）；`--with-assets` 把素材打进 APK。
 - **隐藏网页端才有用的控件**：外壳在页面加载时注入一个 `<style>`（`MainActivity.injectShellStyle`），不改
