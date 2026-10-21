@@ -256,7 +256,11 @@ public final class DiagActivity extends Activity {
             line("  没有 libnode.so，无法继续。");
             return null;
         }
-        if (!missing.isEmpty()) line("  有 " + missing.size() + " 个库没解出来或不完整（见上）。");
+        if (!missing.isEmpty()) {
+            line("  有 " + missing.size() + " 个库没解出来或不完整（见上）。");
+            line("  结论: 名字不是 lib*.so 的库，Android 12–15 的安装器不解压，node 会因链接失败以退出码 1 结束——"
+                    + "android-0.3.1 离线版的已知问题，换用库名修正后的新版即可。");
+        }
         return node;
     }
 
