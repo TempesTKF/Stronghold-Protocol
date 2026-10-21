@@ -80,8 +80,7 @@ fi
 
 MIN_SDK=26
 TARGET_SDK=36
-# 离线版要求 Android 11+：它靠 APK 里的 lib/<abi>/libnode.so 与 libz.so.1 这类带版本号的
-# .so 名字运行，而"这些名字会不会被安装器解压出来"只在 API 36 上实测过。
+# 离线版要求 Android 11+：内置运行时只在 Android 11 以上的系统上考虑过（库名已改成 lib*.so，见下面打包原生库处）。
 if [ "$MODE" = offline ]; then MIN_SDK=30; fi
 
 need() { [ -e "$1" ] || { echo "缺少工具或文件：$1" >&2; exit 1; }; }
@@ -182,9 +181,10 @@ echo "[5/6] pack + zipalign"
 # 离线版的原生库：摆成 lib/<abi>/ 后按 DEFLATE 加入（APK 里 89MB → 约 24MB；安装时会解压到
 # nativeLibraryDir，所以压缩不会影响从那里执行 libnode.so）。
 if [ "$MODE" = offline ]; then
+  # Termux 库名带版本号（libcrypto.so.3…），Android 12–15 的安装器不解压这种名字：改名成 lib*.so 并修补
+  # 各 ELF 里的依赖名（android/tools/so-names.mjs 有详细说明）
   rm -rf "$OUT/stage"
-  mkdir -p "$OUT/stage/lib/$ABI"
-  cp -f "$RUNTIME_DIR"/*.so* "$RUNTIME_DIR/libnode.so" "$OUT/stage/lib/$ABI/" 2>/dev/null || true
+  node "$HERE/tools/so-names.mjs" "$RUNTIME_DIR" "$OUT/stage/lib/$ABI"
   ( cd "$OUT/stage" && "$JDK_WIN/bin/jar" --update --file "$OUT_WIN/base.apk" lib )
   echo "    已加入原生库：$(cd "$OUT/stage" && find lib -type f | tr '\n' ' ')"
 fi

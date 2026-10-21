@@ -55,7 +55,11 @@ bash android/tools/pack-assets.sh                # 可选：素材包 → androi
 - **运行时**（`android/tools/stage-runtime.sh`）：从 Termux 镜像取 `nodejs-lts`（现为 **Node 24.18.0**）
   与它 `DT_NEEDED` 里真正引用的库——`libc++_shared.so`、`libcares.so`、`libcrypto.so.3`、`libssl.so.3`、
   `libicuuc.so.78`、`libicui18n.so.78`、`libicudata.so.78`、`libsqlite3.so`、`libz.so.1`
-  （`libc`/`libdl`/`libm` 由 Android 提供）。它们以 `lib/<abi>/*.so*` 打进 APK，安装后位于
+  （`libc`/`libdl`/`libm` 由 Android 提供）。`build.sh` 打包时用 `android/tools/so-names.mjs` 把带版本号的
+  改名为 `libcrypto3.so`、`libicuuc78.so`、`libz1.so` 这样的 `lib*.so`，并原地修补各 ELF 的 `DT_NEEDED`、
+  `DT_SONAME` 与版本需求表里的库名——Android 12–15 安装不可调试的 APK 时只解压 `lib*.so`（Android 16 才放开），
+  带版本号的库不解压，node 会因链接失败以退出码 1 结束（android-0.3.1 首页的「node exited (1)」）。
+  它们以 `lib/<abi>/*.so` 打进 APK，安装后位于
   `nativeLibraryDir`——Android 10+ 只允许从这里执行二进制。合计约 89 MB（APK 里压缩后约 24 MB）。
   下载逐层校验，任一处不符即中止：`Packages` 索引的 SHA256 与同一镜像的 `InRelease` 核对（设
   `TERMUX_KEYRING` 且装了 `gpgv` 时再验 `InRelease` 签名）；每个 `.deb` 与索引里的 SHA256 核对；
@@ -111,7 +115,8 @@ bash android/tools/pack-assets.sh                # 可选：素材包 → androi
 - 代码在 `android/app/src/main/java/app/stronghold/shell/`：`LocalServerService`（前台服务，持有 node 进程）、`MainActivity`（WebView、三种界面、探活）、
   `LocalRuntime`（解压与启动本机服务器）、`BuildMode`（构建期常量，`build.sh` 在 `MODE=offline` 时
   用 `build/gen-src` 里的另一份替换源码树里那份）。
-- **离线版要求 Android 11+**（minSdk 30）：带版本号的 `.so` 名字能否被安装器解压出来只在 API 36 上实测过。
+- **离线版要求 Android 11+**（minSdk 30）。android-0.3.1 的库名带版本号，在 Android 12–15（含鸿蒙 4.x 的安卓兼容层）
+  上启动即失败；改名修补后的运行时还要在这些系统的真机上确认。
 
 ## 使用
 
