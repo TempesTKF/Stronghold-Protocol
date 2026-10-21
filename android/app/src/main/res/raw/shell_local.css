@@ -1,0 +1,44 @@
+/*
+ * 本地模式（离线版在手机上自己开服、只有自己一个真人玩家）额外注入的样式：隐藏只对联机有用的控件。
+ * 连别的服务器（切换服务器）时不注入。选择器对应客户端现有的类名，客户端改名后要跟着改。
+ */
+
+/* 延迟显示：服务器就在本机，延迟恒为 0 左右
+   （public/js/ui/components.js PingPill：标题页、服务器大厅、同盟页 .room-ping、对局 HUD） */
+.ping,
+.room-ping {
+  display: none !important;
+}
+
+/* 服务器大厅（public/js/screens/serverDirectory.js）：在线人数等统计与公开房间列表；
+   「匹配房间」「密钥 / 邀请链接加入」两个按钮——只留「创建同盟」（.btn--primary） */
+.server-overview__head,
+.server-stats,
+.server-rooms,
+.server-create__actions > .btn:not(.btn--primary) {
+  display: none !important;
+}
+/* 原来是三列按钮的网格，只剩一个按钮时改成一列，宽度约等于原来的一格多一点 */
+.server-create__actions {
+  grid-template-columns: minmax(0, 1fr) !important;
+  width: 4rem !important;
+}
+
+/* 选择模拟协议页（public/js/screens/lobby.js）：「03 加入同盟」整块（密钥输入、观战、最近的同盟） */
+.join-panel,
+.section-label:has(+ .join-panel) {
+  display: none !important;
+}
+
+/* 同盟页（public/js/screens/room.js）与对局 HUD（public/js/ui/hud.js）：同盟密钥 / 复制邀请链接、观战席 */
+.invite,
+.specbar,
+.specpill {
+  display: none !important;
+}
+
+/* 标题页「下载完整素材」：把本服务器的素材再缓存进浏览器——素材本来就在手机本地，只会多占一份空间
+   （public/js/ui/assetDownload.js；旁边的「导入素材」保留） */
+.title-assets__item:has([data-testid="asset-download"]) {
+  display: none !important;
+}

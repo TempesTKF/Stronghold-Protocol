@@ -1,0 +1,13 @@
+/*
+ * 外壳给页面注入的样式（MainActivity.injectShellStyle）：两个构建都生效。
+ * 只隐藏网页端才有用的控件，不改 public/ 的代码；选择器写的是客户端现有的类名，
+ * 客户端改名后这里要跟着改（每条注明出处）。
+ */
+
+/* 全屏切换：外壳本身就是沉浸式横屏全屏，这个按钮没有意义
+   （public/js/ui/device.js FullscreenButton，用在 screens/title.js 的 .title-fs 与 screens/game.js 的 .gm__fs；
+   标题页的设置齿轮也带 .fsbtn，所以只按这两个类名隐藏） */
+.title-fs,
+.gm__fs {
+  display: none !important;
+}

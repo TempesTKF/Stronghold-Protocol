@@ -76,6 +76,16 @@ MODE=offline bash android/build.sh               # → android/build/stronghold-
   `soloReconnectWindowMs`（24 小时）都拉到 20 天，不改 `server/` 代码。单人对局在离开期间停着等；
   带 AI 队友的同盟房间按服务器的托管规则继续进行。服务器进程被结束（通知上点「停止」、系统强杀、
   重启手机、升级 APK）后对局不会保留——服务端本身不落盘对局状态。
+- **皮肤等插件**：`stage-game.sh --plugins <目录>` 把目录下带 `plugin.json` 的插件文件夹一起打进游戏目录的
+  `plugins/`（不跟随软链）。TKF v0.3.1 发布的皮肤素材包 `official-operator-skins.zip`（404MB，4 个外观插件、
+  274 套皮肤）解开后传入即可；服务器启动时照常扫描、校验 `plugin.lock.json`，玩家在设置里自己打开。
+  这些是官方美术，离线包只供个人使用。
+- **隐藏网页端才有用的控件**：外壳在页面加载时注入一个 `<style>`（`MainActivity.injectShellStyle`），不改
+  `public/`。`res/raw/shell.css` 两个构建都注入：全屏切换按钮（外壳本来就是沉浸式全屏）。
+  `res/raw/shell_local.css` 只在本地模式注入：延迟显示、服务器大厅的统计与公开房间列表、匹配房间、
+  密钥 / 邀请链接加入、观战、复制密钥 / 链接、标题页「下载完整素材」。「添加到桌面」（PWA）在 WebView 里
+  本来就不出现。选择器依赖客户端现有类名（文件里逐条注明出处），客户端改名后要跟着改；「公开房间」开关
+  只能靠翻译过的 aria-label 定位，太脆，保留未隐藏。
 - 代码在 `android/app/src/main/java/app/stronghold/shell/`：`LocalServerService`（前台服务，持有 node 进程）、`MainActivity`（WebView、三种界面、探活）、
   `LocalRuntime`（解压与启动本机服务器）、`BuildMode`（构建期常量，`build.sh` 在 `MODE=offline` 时
   用 `build/gen-src` 里的另一份替换源码树里那份）。

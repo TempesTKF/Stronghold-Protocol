@@ -29,6 +29,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import org.json.JSONObject;
+
 /**
  * 单 Activity 外壳：沉浸式横屏 WebView 加载客户端。
  *
@@ -415,6 +417,17 @@ public final class MainActivity extends Activity {
                 String target = currentUrl;
                 root.post(() -> showError(target, detail, true));
             }
+
+            // 页面一可见就注入一次、加载完再补一次（同一个 <style>，重复注入只是覆盖）
+            @Override
+            public void onPageCommitVisible(WebView v, String url) {
+                injectShellStyle(v, url);
+            }
+
+            @Override
+            public void onPageFinished(WebView v, String url) {
+                injectShellStyle(v, url);
+            }
         });
 
         view.setWebChromeClient(new WebChromeClient() {
@@ -452,6 +465,36 @@ public final class MainActivity extends Activity {
             }
         });
         return view;
+    }
+
+    // ---- 注入样式 --------------------------------------------------------------------------------------------------
+
+    /**
+     * 隐藏网页端才有用的控件（res/raw/shell.css：两个构建都要；res/raw/shell_local.css：只在本地模式，
+     * 手机自己开服、只有自己一个真人时，延迟、匹配、密钥加入、观战、素材下载都没有意义）。
+     * 只加一个 &lt;style&gt;，不改客户端代码；连别的服务器时不带本地模式那份。
+     */
+    private void injectShellStyle(WebView view, String url) {
+        if (url == null || !(url.startsWith("http://") || url.startsWith("https://"))) return;
+        String css = readRaw(R.raw.shell);
+        if (url.startsWith("http://127.0.0.1:" + LOCAL_PORT + "/")) css += "\n" + readRaw(R.raw.shell_local);
+        view.evaluateJavascript("(function(c){var s=document.getElementById('sp-shell-style');"
+                + "if(!s){s=document.createElement('style');s.id='sp-shell-style';"
+                + "(document.head||document.documentElement).appendChild(s);}s.textContent=c;})("
+                + JSONObject.quote(css) + ")", null);
+    }
+
+    private String readRaw(int id) {
+        try (InputStream in = getResources().openRawResource(id)) {
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = in.read(buffer)) > 0) out.write(buffer, 0, count);
+            return out.toString("UTF-8");
+        } catch (IOException e) {
+            Log.w(TAG, "raw resource " + id + ": " + e);
+            return "";
+        }
     }
 
     // ---- 全屏 ------------------------------------------------------------------------------------------------------

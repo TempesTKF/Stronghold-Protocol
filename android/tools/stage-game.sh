@@ -5,7 +5,12 @@
 # 而单个 zip 只要 open() 一个流就能读，解压也快得多。
 #
 #   bash android/tools/stage-game.sh              # 含素材（约 550MB，离线版出货用）
-#   bash android/tools/stage-game.sh --no-assets  # 不含素材（约 6MB，只跑通流程用）
+#   bash android/tools/stage-game.sh --no-assets  # 不含素材（约 9MB，只跑通流程用）
+#   bash android/tools/stage-game.sh --plugins <目录>   # 另外带上 <目录> 下的插件（可重复）
+#
+# --plugins：<目录> 本身或它的每个子目录只要有 plugin.json，就按原名复制进游戏目录的 plugins/
+# （服务器启动时自己扫描、校验；外观插件在 设置 → 插件 里由玩家自己打开）。
+# 例：TKF v0.3.1 的皮肤素材包 official-operator-skins.zip 解开后有 4 个插件文件夹，把解开的目录传进来即可。
 #
 # 前置：仓库根跑过 npm install（要有服务端依赖与 public/vendor）与 npm run setup（要有 public/assets、public/fonts）。
 #
@@ -26,7 +31,23 @@ STAGE="$ANDROID_DIR/build/stage-game"
 ZIP="$ASSETS_DIR/game.zip"
 
 WITH_ASSETS=1
-if [ "${1:-}" = "--no-assets" ]; then WITH_ASSETS=0; fi
+EXTRA_PLUGINS=()
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --no-assets) WITH_ASSETS=0; shift ;;
+    --plugins)
+      [ -n "${2:-}" ] && [ -d "$2" ] || { echo "--plugins 后面要跟一个存在的目录" >&2; exit 1; }
+      if [ -f "$2/plugin.json" ]; then
+        EXTRA_PLUGINS+=("$(cd "$2" && pwd)")
+      else
+        for dir in "$2"/*/; do
+          [ -f "$dir/plugin.json" ] && EXTRA_PLUGINS+=("$(cd "$dir" && pwd)")
+        done
+      fi
+      shift 2 ;;
+    *) echo "未知参数：$1（可用 --no-assets、--plugins <目录>）" >&2; exit 1 ;;
+  esac
+done
 
 ITEMS=(server shared data packs plugins schemas tools public package.json)
 SERVER_DEPS=(ws ses acorn)
@@ -83,6 +104,17 @@ done
 echo "node_modules：$DEPS"
 # 手机上的服务端入口：拉长房间与断线会话的保留窗口，切后台回来能接着打（见文件头）
 cp "$HERE/offline-entry.mjs" "$STAGE/android-entry.mjs"
+for dir in "${EXTRA_PLUGINS[@]+"${EXTRA_PLUGINS[@]}"}"; do
+  name="$(basename "$dir")"
+  case "$name" in _*|.*) echo "跳过插件目录 $name（以 _ 或 . 开头的目录服务器不加载）" >&2; continue ;; esac
+  [ ! -e "$STAGE/plugins/$name" ] || { echo "插件 $name 与仓库 plugins/ 里的同名，停止" >&2; exit 1; }
+  # 不跟随软链（-P）：插件目录里的软链不该把目录外的文件带进 APK
+  cp -RP "$dir" "$STAGE/plugins/$name"
+  if find "$STAGE/plugins/$name" -type l | grep -q .; then
+    echo "插件 $name 里有软链，拒绝打包" >&2; exit 1
+  fi
+  echo "插件：$name（$(du -sh "$dir" | cut -f1)）"
+done
 
 if [ "$WITH_ASSETS" = 0 ]; then
   rm -rf "$STAGE/public/assets" "$STAGE/public/fonts"
