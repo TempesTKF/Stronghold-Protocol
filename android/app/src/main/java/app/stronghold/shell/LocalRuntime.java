@@ -29,7 +29,9 @@ import java.util.zip.ZipInputStream;
  * 以 lib/&lt;abi&gt;/lib*.so 打进 APK（安装后位于 nativeLibraryDir——Android 10+ 只允许从这里
  * 执行二进制）；游戏文件由 android/tools/stage-game.sh 收进 assets/game/**。
  *
- * 服务端只依赖 Node 核心模块 + ws，没有任何原生扩展，所以仓库代码零改动。
+ * 服务端只依赖 Node 核心模块与纯 JS 的 ws / ses / acorn，没有任何原生扩展，所以仓库代码零改动。
+ * 带玩法插件的房间会用 child_process.fork 另起对局进程：fork 用的是 process.execPath，也就是
+ * nativeLibraryDir 里的这份 libnode.so，同样允许执行；原版内容（不装插件）只有一个进程。
  */
 final class LocalRuntime {
 
@@ -127,6 +129,7 @@ final class LocalRuntime {
         env.put("HOST", "127.0.0.1");
         env.put("SP_ASSET_INDEX", "0");   // 手机上跳过对全部素材做内容哈希索引
         env.put("SP_NO_BROWSER", "1");
+        env.put("SP_STUDIO", "off");      // 插件工作台是电脑上的创作工具，手机上不开（它的试玩会另起 node 子进程）
         env.put("NODE_ENV", "production");
         env.put("HOME", ctx.getFilesDir().getAbsolutePath());
         env.put("TMPDIR", ctx.getCacheDir().getAbsolutePath());
@@ -175,10 +178,15 @@ final class LocalRuntime {
     private void extractBundle(File dir) throws IOException {
         ZipInputStream zip = new ZipInputStream(context.getAssets().open(GAME_ZIP));
         byte[] buffer = new byte[65536];
+        String base = dir.getCanonicalPath() + File.separator;
         try {
             ZipEntry entry;
             while ((entry = zip.getNextEntry()) != null) {
                 File target = new File(dir, entry.getName());
+                // 条目名带 ../ 或绝对路径时会写到 game/ 之外（zip slip）：整包拒绝，不跳过
+                if (!target.getCanonicalPath().startsWith(base)) {
+                    throw new IOException("zip entry outside target: " + entry.getName());
+                }
                 if (entry.isDirectory()) {
                     if (!target.isDirectory() && !target.mkdirs()) throw new IOException("mkdirs failed: " + target);
                     continue;

@@ -20,7 +20,10 @@
 
 - **联机版**：外壳加载哪台服务器，就用哪台的客户端与素材，版本天然一致——与手机浏览器打开同一地址等价。
 - **离线版**：由手机自己跑 `server/index.js`，WebView 加载 `127.0.0.1`。服务端只依赖 Node 核心
-  模块 + `ws`（纯 JS，无原生扩展、无 `worker_threads`、无 `child_process`），所以仓库代码零改动。
+  模块与纯 JS 的 `ws` / `ses` / `acorn`（无原生扩展），所以仓库代码零改动。0.3.0 起带玩法插件的房间、
+  受信插件与插件工作台会用 `child_process.fork` 另起 node：`fork` 用的是 `process.execPath`，即
+  `nativeLibraryDir` 里的 `libnode.so`，同样可执行；原版内容（不装插件）只有一个进程，工作台在手机上关掉
+  （`SP_STUDIO=off`）。服务器大厅（`/api/lobby`、匹配、公开房间）是同一台服务器的接口，离线时就是手机自己的大厅。
 
 ## 构建
 
@@ -51,9 +54,15 @@ MODE=offline bash android/build.sh               # → android/build/stronghold-
   `libicuuc.so.78`、`libicui18n.so.78`、`libicudata.so.78`、`libsqlite3.so`、`libz.so.1`
   （`libc`/`libdl`/`libm` 由 Android 提供）。它们以 `lib/<abi>/*.so*` 打进 APK，安装后位于
   `nativeLibraryDir`——Android 10+ 只允许从这里执行二进制。合计约 89 MB（APK 里压缩后约 24 MB）。
-- **游戏文件**（`android/tools/stage-game.sh`）：`server/ shared/ data/ packs/ public/ package.json`
-  与 `node_modules/ws`，**加上素材就是那 550MB**（`npm run setup` 下过才有；`--no-assets` 可以只打 6MB
-  的骨架用于跑流程）。打成一个 `assets/game.zip`：Android 的 `AssetManager.list()` 数不出压缩的
+  下载逐层校验，任一处不符即中止：`Packages` 索引的 SHA256 与同一镜像的 `InRelease` 核对（设
+  `TERMUX_KEYRING` 且装了 `gpgv` 时再验 `InRelease` 签名）；每个 `.deb` 与索引里的 SHA256 核对；
+  有锁文件 `android/tools/termux-runtime.lock` 时还要与它一致（`--write-lock` 生成/升级）；解包前拒绝
+  绝对路径与含 `..` 的成员，挑出的文件解析软链后必须仍在解包目录内且是 ELF。
+- **游戏文件**（`android/tools/stage-game.sh`）：`server/ shared/ data/ packs/ plugins/ schemas/ tools/
+  public/ package.json`，以及服务端 import 的包（`ws ses acorn`）按 `package-lock.json` 求出的依赖闭包
+  （`plugins/`、`schemas/`、`tools/` 与 `ses`/`acorn` 是 0.3.x 起服务端启动或建房时会读到的），
+  **加上素材就是那 550MB**（`npm run setup` 下过才有；`--no-assets` 可以只打约 9MB 的骨架用于跑流程）。
+  运行期解压时拒绝跳出 `filesDir/game` 的条目（zip slip）。打成一个 `assets/game.zip`：Android 的 `AssetManager.list()` 数不出压缩的
   assets，单个 zip 只要一个流就能读，运行期解压也快。
 - **首次启动**：`LocalRuntime` 把 `game.zip` 流式解压到 `filesDir/game`（显示进度），写一个版本标记；
   APK 版本变了会重新解压。随后以 `PORT=3000 HOST=127.0.0.1 SP_ASSET_INDEX=0` 启动 `server/index.js`
@@ -96,6 +105,11 @@ DOM storage（显示设置与重连信息）、免手势媒体播放、关缩放
 
 仍需真机验收：真实触控手感、音频、WebGL 帧率、刘海安全区、离线版首次解压 550MB 的耗时与占用
 （装上后约占 1.15GB：APK 620MB + 解压后 550MB）。
+
+移植到 0.3.1（TKF master `5046ecc3`）后在桌面上验证过：`stage-game.sh --no-assets` 产出的 `game.zip`
+解压到空目录，以 `LocalRuntime` 的环境变量启动 `server/index.js`，`/healthz`、`/api/lobby`、`/vendor/`
+都可用，WebSocket 能建单人房并开局到「确认本局信息」，浏览器里标题页与服务器大厅正常渲染。
+页面引用的 Google Fonts 离线时取不到，会回落到系统字体（素材包里的 `public/fonts` 不受影响）。
 
 ### 在模拟器上验证
 
