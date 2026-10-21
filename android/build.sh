@@ -51,6 +51,11 @@ JDK_WIN="$(find_existing "${JDK_HOME:-}" "$JAVA_HOME_SANE" \
   "${LOCALAPPDATA:-}/Programs/Android Studio/jbr" "${PROGRAMFILES:-}/Android/Android Studio/jbr")" \
   || { echo "找不到 JDK：设 JDK_HOME 指向含 bin/javac 的目录，或安装 Android Studio 使用其自带 JBR" >&2; exit 1; }
 
+# 从 $HOME 探到的是 /c/Users/... 形式；拼进 -bootclasspath "a;b" 这类参数时 Git Bash 不会替它转换，
+# 原生工具就找不到文件，所以统一换成 Windows 形式
+SDK_WIN="$(win "$SDK_WIN")"
+JDK_WIN="$(win "$JDK_WIN")"
+
 BT_VERSION="${BT_VERSION:-36.0.0}"
 PLATFORM="${PLATFORM:-android-36}"
 BT="$SDK_WIN/build-tools/$BT_VERSION"
@@ -134,11 +139,12 @@ NOSTORE=(--no-compress-regex '\.(png|jpe?g|webp|mp3|ogg|wav|skel|atlas|otf|ttf|w
   "$OUT_WIN/res.zip"
 
 echo "[3/6] javac"
-find "$HERE/app/src/main/java" "$OUT/gen" -name '*.java' | while IFS= read -r file; do printf '%s\n' "$(win "$file")"; done > "$OUT/sources.txt"
+# javac 的 @文件按空白切参数：路径带空格（如 "claude projects"）时必须加引号
+find "$HERE/app/src/main/java" "$OUT/gen" -name '*.java' | while IFS= read -r file; do printf '"%s"\n' "$(win "$file")"; done > "$OUT/sources.txt"
 if [ "$MODE" = offline ]; then
   grep -v "app/stronghold/shell/BuildMode.java" "$OUT/sources.txt" > "$OUT/sources.online.txt"
   mv "$OUT/sources.online.txt" "$OUT/sources.txt"
-  find "$GEN_SRC" -name '*.java' | while IFS= read -r file; do printf '%s\n' "$(win "$file")"; done >> "$OUT/sources.txt"
+  find "$GEN_SRC" -name '*.java' | while IFS= read -r file; do printf '"%s"\n' "$(win "$file")"; done >> "$OUT/sources.txt"
 fi
 # lambda 脱糖需要 core-lambda-stubs.jar：android.jar 里没有 java.lang.invoke.LambdaMetafactory（AGP 同样这么做）
 "$JDK_WIN/bin/javac" -encoding UTF-8 -source 8 -target 8 \
