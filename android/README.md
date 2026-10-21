@@ -178,6 +178,17 @@ adb logcat -s StrongholdShell:* StrongholdNode:*
 游戏内部只能靠截图量坐标驱动；**模拟器的 GPU 是转发或软件渲染**，帧率数字不代表真机；
 Git Bash 里给 `adb shell` 传设备绝对路径要设 `MSYS_NO_PATHCONV=1`（但别在跑构建脚本时设，会弄坏它内部的路径）。
 
+### 诊断小工具
+
+离线版首页报「本机服务器启动失败：node exited (…)」而玩家手里没有 adb 时，给他装 `android/diag`
+（包名 `app.stronghold.diag`，约 21KB，`bash android/diag/build.sh` → `android/build/diag/stronghold-diag-debug.apk`）。
+它和游戏是两个包，只读离线版的安装包与 `nativeLibraryDir`，不碰离线版的数据、设置和正在运行的服务器：
+报告设备与系统、两个包的版本、3000 端口被谁占用、APK 里的 `lib/` 与手机上实际解出的库是否一致，
+用离线版的 `libnode.so` 跑 `assets/checks.js`（网络接口、加密、Intl、临时目录、监听端口），
+再把 `game.zip` 里除素材外的服务端代码解到自己的缓存目录，按 `LocalRuntime.start` 的环境变量在
+39170 端口试跑 `android-entry.mjs`，node 的原始输出整段进报告。玩家点「复制报告」或「分享报告」发回来。
+离线版数据目录里导入的皮肤插件别的应用读不到，试跑不含它们。
+
 ## 运行时与素材的授权
 
 离线版会把 Termux 的 Node 二进制（Node 是 MIT、ICU 是 Unicode 许可、OpenSSL 是 Apache-2.0，
