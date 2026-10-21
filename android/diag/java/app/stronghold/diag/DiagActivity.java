@@ -134,6 +134,8 @@ public final class DiagActivity extends Activity {
         line("  型号: " + Build.MANUFACTURER + " " + Build.MODEL + " (" + Build.DEVICE + ")");
         line("  Android: " + Build.VERSION.RELEASE + " / API " + Build.VERSION.SDK_INT);
         line("  系统: " + Build.DISPLAY);
+        String harmony = harmonyVersion();
+        if (harmony != null) line("  鸿蒙: " + harmony + "（安卓兼容层，上面的 Android 版本是兼容的 API 级别）");
         line("  ABI: " + String.join(",", Build.SUPPORTED_ABIS));
         StatFs data = new StatFs(getFilesDir().getAbsolutePath());
         line("  /data 剩余: " + (data.getAvailableBytes() >> 20) + "MB / " + (data.getTotalBytes() >> 20) + "MB");
@@ -171,6 +173,32 @@ public final class DiagActivity extends Activity {
         if (!extractServer(game, dir)) return;
         exec(node, game, dir, new String[] {ENTRY}, 60, "Local:");
         deleteTree(dir);
+    }
+
+    /**
+     * 鸿蒙（带安卓兼容层的 2.x–4.x）的版本号；不是鸿蒙返回 null。华为的系统类 com.huawei.system.BuildEx
+     * 的 getOsBrand() 在鸿蒙上返回 "harmony"，版本号在系统属性 hw_sc.build.platform.version。都靠反射读，
+     * 非华为设备上没有这些类，直接返回 null。
+     */
+    private static String harmonyVersion() {
+        try {
+            Class<?> buildEx = Class.forName("com.huawei.system.BuildEx");
+            Object brand = buildEx.getMethod("getOsBrand").invoke(null);
+            if (!"harmony".equalsIgnoreCase(String.valueOf(brand))) return null;
+        } catch (Throwable e) {
+            return null;
+        }
+        String version = systemProperty("hw_sc.build.platform.version");
+        return version.isEmpty() ? "版本未知" : version;
+    }
+
+    private static String systemProperty(String key) {
+        try {
+            Class<?> properties = Class.forName("android.os.SystemProperties");
+            return String.valueOf(properties.getMethod("get", String.class, String.class).invoke(null, key, ""));
+        } catch (Throwable e) {
+            return "";
+        }
     }
 
     private ApplicationInfo describePackage(String name) {

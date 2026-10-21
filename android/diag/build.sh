@@ -31,7 +31,7 @@ echo "[1/5] aapt2 link"
 "$BT/aapt2" link -o "$OUT_WIN/base.apk" -I "$PLATFORM_JAR" \
   --manifest "$(win "$HERE/AndroidManifest.xml")" -A "$(win "$HERE/assets")" \
   --min-sdk-version "$MIN_SDK" --target-sdk-version 36 \
-  --version-code 2 --version-name 1.1
+  --version-code 3 --version-name 1.2
 
 echo "[2/5] javac"
 find "$HERE/java" -name '*.java' | while IFS= read -r file; do printf '"%s"\n' "$(win "$file")"; done > "$OUT/sources.txt"
