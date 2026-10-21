@@ -34,6 +34,10 @@
     <string name="local_extracting">正在解压内置游戏文件（%1$d 个）…</string>
     <string name="local_starting">正在启动本机服务器…</string>
     <string name="local_failed">本机服务器启动失败：%1$s</string>
+    <string name="local_channel">本机服务器</string>
+    <string name="local_notification_title">卫戍协议 · 本机服务器运行中</string>
+    <string name="local_notification_text">对局保留在手机上，随时回来继续。点「停止」会结束对局。</string>
+    <string name="local_notification_stop">停止</string>
 
     <string name="remote_note">返回键可以调出「切换服务器 / 退出」。</string>
 </resources>

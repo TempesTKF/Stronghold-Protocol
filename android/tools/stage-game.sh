@@ -81,6 +81,8 @@ for dep in $DEPS; do
   cp -rL "$REPO/node_modules/$dep" "$STAGE/node_modules/$dep"
 done
 echo "node_modules：$DEPS"
+# 手机上的服务端入口：拉长房间与断线会话的保留窗口，切后台回来能接着打（见文件头）
+cp "$HERE/offline-entry.mjs" "$STAGE/android-entry.mjs"
 
 if [ "$WITH_ASSETS" = 0 ]; then
   rm -rf "$STAGE/public/assets" "$STAGE/public/fonts"

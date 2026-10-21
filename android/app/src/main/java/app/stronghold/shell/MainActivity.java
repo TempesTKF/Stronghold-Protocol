@@ -50,7 +50,6 @@ public final class MainActivity extends Activity {
     private View customView;
     private WebChromeClient.CustomViewCallback customViewCallback;
     private String currentUrl;
-    private final LocalRuntime local = new LocalRuntime();
 
     @Override
     protected void onCreate(Bundle state) {
@@ -91,7 +90,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        local.stop();
+        // 本机服务器归 LocalServerService 管，界面销毁不停它：回来时重连同一局
         if (web != null) {
             root.removeView(web);
             web.destroy();
@@ -130,21 +129,35 @@ public final class MainActivity extends Activity {
         return url != null ? url : "http://127.0.0.1:3000";
     }
 
-    /** 离线版：解压内置游戏文件 → 启动本机服务器 → 加载 127.0.0.1。 */
+    /**
+     * 离线版：解压内置游戏文件 → 启动本机服务器（前台服务 {@link LocalServerService}）→ 加载 127.0.0.1。
+     * 服务器已经在跑（切后台回来、界面被重建）就直接加载，页面用保存的令牌重连原来的对局。
+     */
     private void startLocal() {
         getSharedPreferences(PREFS, MODE_PRIVATE).edit().putString(KEY_MODE, "local").apply();
+        // Android 13+ 不授权通知时前台服务照常运行，只是通知栏里看不到它和「停止」按钮
+        if (Build.VERSION.SDK_INT >= 33
+                && checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)
+                        != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[] {android.Manifest.permission.POST_NOTIFICATIONS}, 1);
+        }
         showMessage(getString(R.string.local_starting));
         new Thread(() -> {
             try {
-                local.prepare(this, message -> runOnUiThread(() -> {
-                    if (!isFinishing()) showMessage(message);
-                }));
-                runOnUiThread(() -> {
-                    if (!isFinishing()) showMessage(getString(R.string.local_starting));
-                });
-                local.start(this, LOCAL_PORT);
-                if (!LocalRuntime.waitHealthy(LOCAL_PORT, 90000)) {
-                    throw new IllegalStateException("healthz timeout");
+                if (LocalRuntime.healthy(LOCAL_PORT)) {
+                    Log.i(TAG, "local server already running");
+                } else {
+                    new LocalRuntime().prepare(this, message -> runOnUiThread(() -> {
+                        if (!isFinishing()) showMessage(message);
+                    }));
+                    runOnUiThread(() -> {
+                        if (!isFinishing()) showMessage(getString(R.string.local_starting));
+                    });
+                    LocalServerService.start(this, LOCAL_PORT);
+                    if (!LocalRuntime.waitHealthy(LOCAL_PORT, 90000)) {
+                        String why = LocalServerService.failure();
+                        throw new IllegalStateException(why != null ? why : "healthz timeout");
+                    }
                 }
                 Log.i(TAG, "local server ready");
                 runOnUiThread(() -> {

@@ -1,0 +1,8 @@
+# android/tools/stage-runtime.sh 的锁文件：arch 包名 Filename SHA256（--write-lock 生成）
+aarch64 c-ares pool/main/c/c-ares/c-ares_1.34.9_aarch64.deb 623d84855e176f3f2a415d24c0e1d2f529356f4b5439bb3313e6d7ff0da4585c
+aarch64 libc++ pool/main/libc/libc++/libc++_30_aarch64.deb 53d0b84a7ba7459024257cb94d5b136fe13ef858567f65a8064b35950799f2ca
+aarch64 libicu pool/main/libi/libicu/libicu_78.3_aarch64.deb f536403f65a08fe0df6e7304184e902d54def77d5c3bd5edfd9109d57601d276
+aarch64 libsqlite pool/main/libs/libsqlite/libsqlite_3.54.1_aarch64.deb 0856cac8cc87f6e112f2eef4fcac6ad5cb08209ecb7cc260f997874fc186a3c0
+aarch64 nodejs-lts pool/main/n/nodejs-lts/nodejs-lts_24.18.0-1_aarch64.deb 490f4d08c45b25a7ea7db6ee466ebb3ee61f07083260b85332704ed018f59a87
+aarch64 openssl pool/main/o/openssl/openssl_1:3.6.5_aarch64.deb a2fb7856875e63ef6b90442752e05974813372c3ca86d2513a78ea43c67a0f8b
+aarch64 zlib pool/main/z/zlib/zlib_1.3.2_aarch64.deb 75e7d0af17fcc3b40004309fdc00a1ddb9ae08346dce5e269902c34ac3966ac9

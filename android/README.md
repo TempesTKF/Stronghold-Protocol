@@ -68,7 +68,15 @@ MODE=offline bash android/build.sh               # → android/build/stronghold-
   APK 版本变了会重新解压。随后以 `PORT=3000 HOST=127.0.0.1 SP_ASSET_INDEX=0` 启动 `server/index.js`
   （`SP_ASSET_INDEX=0` 是为了跳过对 790MB 素材做内容哈希索引），轮询 `/healthz` 就绪后加载
   `http://127.0.0.1:3000/`。
-- 代码在 `android/app/src/main/java/app/stronghold/shell/`：`MainActivity`（WebView、三种界面、探活）、
+- **随时重连对局**：本机服务器由前台服务 `LocalServerService` 持有（常驻通知，带「停止」按钮），
+  返回键「退出」、界面被系统回收、切后台都不会停它；回到应用时若 `/healthz` 仍应答就直接加载，页面用
+  `localStorage` 里的令牌重连原来的对局。服务端入口是 `android-entry.mjs`（源文件
+  `android/tools/offline-entry.mjs`，由 `stage-game.sh` 放进游戏目录），它把 `emptyRoomMs`（TKF 加的
+  "无人在线 5 分钟解散房间"，单人对局也会被收）、`reconnectWindowMs`（10 分钟）与
+  `soloReconnectWindowMs`（24 小时）都拉到 20 天，不改 `server/` 代码。单人对局在离开期间停着等；
+  带 AI 队友的同盟房间按服务器的托管规则继续进行。服务器进程被结束（通知上点「停止」、系统强杀、
+  重启手机、升级 APK）后对局不会保留——服务端本身不落盘对局状态。
+- 代码在 `android/app/src/main/java/app/stronghold/shell/`：`LocalServerService`（前台服务，持有 node 进程）、`MainActivity`（WebView、三种界面、探活）、
   `LocalRuntime`（解压与启动本机服务器）、`BuildMode`（构建期常量，`build.sh` 在 `MODE=offline` 时
   用 `build/gen-src` 里的另一份替换源码树里那份）。
 - **离线版要求 Android 11+**（minSdk 30）：带版本号的 `.so` 名字能否被安装器解压出来只在 API 36 上实测过。
@@ -110,6 +118,10 @@ DOM storage（显示设置与重连信息）、免手势媒体播放、关缩放
 解压到空目录，以 `LocalRuntime` 的环境变量启动 `server/index.js`，`/healthz`、`/api/lobby`、`/vendor/`
 都可用，WebSocket 能建单人房并开局到「确认本局信息」，浏览器里标题页与服务器大厅正常渲染。
 页面引用的 Google Fonts 离线时取不到，会回落到系统字体（素材包里的 `public/fonts` 不受影响）。
+同日在 Windows（Git Bash、路径含空格、Temurin 21、build-tools 36.0.0、android-36 r02）上跑通了
+`stage-runtime.sh --write-lock arm64-v8a` → `stage-game.sh --no-assets` → `MODE=offline build.sh`
+（APK 约 43MB）；`termux-runtime.lock` 就是那次的结果。装机运行（前台服务、重连、触控、音频、WebGL、
+首次解压耗时）还没在真机或模拟器上验证。
 
 ### 在模拟器上验证
 

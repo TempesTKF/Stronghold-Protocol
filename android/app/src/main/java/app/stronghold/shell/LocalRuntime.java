@@ -23,7 +23,8 @@ import java.util.zip.ZipInputStream;
 
 /**
  * 本地模式（离线版内置）：APK 里带着 Node 运行时与整份游戏文件，首次启动解压到 filesDir，
- * 再启动本机服务器（server/index.js），WebView 加载 127.0.0.1——全程不需要网络。
+ * 再启动本机服务器（android-entry.mjs → server/index.js），WebView 加载 127.0.0.1——全程不需要网络。
+ * 服务器进程由 {@link LocalServerService}（前台服务）持有，不随 Activity 销毁，切后台回来能重连同一局。
  *
  * 运行时由 android/tools/stage-runtime.sh 从 Termux 的 nodejs-lts 与依赖里取出，
  * 以 lib/&lt;abi&gt;/lib*.so 打进 APK（安装后位于 nativeLibraryDir——Android 10+ 只允许从这里
@@ -39,6 +40,8 @@ final class LocalRuntime {
     private static final String MARKER = ".staged-version";
     /** 内置游戏文件的打包（android/tools/stage-game.sh 生成；单个 zip 便于流式解压）。 */
     private static final String GAME_ZIP = "game.zip";
+    /** 手机上的服务端入口（android/tools/offline-entry.mjs：拉长了房间与断线会话的保留窗口）。 */
+    private static final String ENTRY = "android-entry.mjs";
 
     /** 解压进度（在后台线程回调，调用方自己切回主线程）。 */
     interface Progress {
@@ -70,7 +73,8 @@ final class LocalRuntime {
     }
 
     static boolean gamePresent(Context context) {
-        return new File(gameDir(context), "server/index.js").isFile();
+        return new File(gameDir(context), "server/index.js").isFile()
+                && new File(gameDir(context), ENTRY).isFile();
     }
 
     /** assets 里有没有游戏文件（离线版才有）。用一个流探一下，不用 AssetManager.list——
@@ -111,8 +115,8 @@ final class LocalRuntime {
         Log.i(TAG, "extracted " + extracted + " files to " + dir);
     }
 
-    /** 启动 node server/index.js；环境沿用仓库的 PORT / HOST 等变量。 */
-    void start(Context ctx, int port) throws IOException {
+    /** 启动 node android-entry.mjs；环境沿用仓库的 PORT / HOST 等变量。返回进程，由调用方等它退出。 */
+    Process start(Context ctx, int port) throws IOException {
         File node = nodeBinary(ctx);
         File dir = gameDir(ctx);
         if (!node.isFile()) throw new IOException("missing runtime: " + node);
@@ -120,7 +124,7 @@ final class LocalRuntime {
 
         List<String> command = new ArrayList<>();
         command.add(node.getAbsolutePath());
-        command.add("server/index.js");
+        command.add(ENTRY);
         ProcessBuilder builder = new ProcessBuilder(command);
         builder.directory(dir);
         builder.redirectErrorStream(true);
@@ -137,6 +141,7 @@ final class LocalRuntime {
         process = builder.start();
         Log.i(TAG, "node started: " + node + " cwd=" + dir);
         drain(process);
+        return process;
     }
 
     void stop() {
@@ -147,21 +152,27 @@ final class LocalRuntime {
         }
     }
 
-    /** 轮询 /healthz，直到服务器可用。 */
+    /** 本机服务器此刻是否在应答 /healthz（已在运行就直接复用，不再起第二个）。 */
+    static boolean healthy(int port) {
+        HttpURLConnection connection = null;
+        try {
+            connection = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/healthz").openConnection();
+            connection.setConnectTimeout(1500);
+            connection.setReadTimeout(1500);
+            return connection.getResponseCode() == 200;
+        } catch (Exception e) {
+            return false;
+        } finally {
+            if (connection != null) connection.disconnect();
+        }
+    }
+
+    /** 轮询 /healthz，直到服务器可用；服务报告进程已退出时提前放弃。 */
     static boolean waitHealthy(int port, long timeoutMs) {
         long deadline = System.currentTimeMillis() + timeoutMs;
         while (System.currentTimeMillis() < deadline) {
-            HttpURLConnection connection = null;
-            try {
-                connection = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/healthz").openConnection();
-                connection.setConnectTimeout(1500);
-                connection.setReadTimeout(1500);
-                if (connection.getResponseCode() == 200) return true;
-            } catch (Exception ignored) {
-                // 还没起来，继续等
-            } finally {
-                if (connection != null) connection.disconnect();
-            }
+            if (healthy(port)) return true;
+            if (LocalServerService.failure() != null) return false;
             try {
                 Thread.sleep(300);
             } catch (InterruptedException e) {
