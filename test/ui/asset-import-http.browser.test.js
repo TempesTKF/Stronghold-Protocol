@@ -286,16 +286,7 @@ test('real HTTP import serves persisted art through app loaders without a servic
     assert.equal(requests.get(url) || 0, beforeReads.get(url) || 0, `${url} read locally after reload`);
   }
 
-  const download = await page.evaluate(async () => {
-    const { createAssetDownload } = await import('/js/assetDownload.js');
-    const queue = createAssetDownload({ concurrency: 1, retries: 0 });
-    await queue.start();
-    return queue.get();
-  });
-  assert.equal(download.cached, files.length, JSON.stringify(download));
-  for (const url of [...Object.values(urls), mediaUrl, ...(spineEntry ? Object.values(spineEntry) : [])]) {
-    assert.equal(requests.get(url) || 0, beforeReads.get(url) || 0, `download skipped ${url}`);
-  }
+  assert.equal(await page.$('[data-testid="asset-download"]'), null, 'bulk download is not exposed');
   assert.ok((requests.get(absentUrl) || 0) > 0, 'unimported art reaches server');
   assert.ok((requests.get('/data/assets.json') || 0) > 0, 'manifest stays on network');
   assert.ok((requests.get('/js/assetPack.js') || 0) > 0, 'code stays on network');

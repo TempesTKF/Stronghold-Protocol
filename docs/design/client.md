@@ -297,13 +297,7 @@ Audio: autochess BGM per phase, UI SFX (buy/sell/refresh/level/merge/ready/timer
 
 ## 13. Local-client art (optional, host-side)
 
-Title-screen asset download (downstream request, 2026-10-14, PR #628): **下载完整素材** explicitly predownloads the server's
-manifest-listed models, textures, audio and optional local art into the browser's HTTP cache. Show file progress,
-bytes read, pause/resume and failed-file retry. Do not mark completion until every listed response is fully read;
-missing server files remain visible failures. Closing the dialog pauses the queue. Cache eviction and refreshes
-do not retain a permanent completion flag. The same dialog can import a local folder or zip. Only bytes whose
-SHA-256 matches the served manifest are kept (a Spine model only as a whole group). They are stored in Cache
-Storage and served by `public/sw.js` for hashed `/assets/`, `/fonts/` and `/media/` URLs alone on secure origins.
+Title-screen bulk predownload was removed at the owner’s request on 2026-10-21 to reduce bandwidth. Only local asset-pack import is offered; normal on-demand gameplay asset loading continues. The import dialog reads manifests only when an import starts. Only bytes whose SHA-256 matches the served manifest are kept, and a Spine model is checked as one complete group. Secure origins use Cache Storage and the service worker for hashed asset URLs.
 On HTTP they are stored in IndexedDB after JavaScript SHA-256 verification; UI images and inline backgrounds resolve imported bytes before assigning URLs. Files already imported are not requested again. See [ASSETS.md](../ASSETS.md#player-initiated-predownload).
 Self-hosted fonts load after the hashed asset manifest arrives: the client fetches imported font bytes and installs each `FontFace` from an ArrayBuffer, instead of requesting the original `/fonts/fonts.css` during page startup. The statistics page loads its own two listed fonts on opening through the same path.
 

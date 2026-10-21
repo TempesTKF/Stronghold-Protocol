@@ -2,7 +2,7 @@
 // The title screen's 导入素材包 (ui/assetImport.js): opening its dialog asks the server for nothing (no art, no manifest,
 // no download); a pack laid out like `node tools/package.mjs --assets` writes it (one folder, public/assets/…, a
 // README.txt) goes in through the dialog's zip picker. Then a one-file zip and a folder-shaped file list are imported,
-// and the server is not asked for those bytes, not even by 下载完整素材. A second page with isSecureContext forced off
+// and the server is not asked for those bytes, and the title has no bulk download action. A second page with isSecureContext forced off
 // with browser storage unavailable must explain why import is unavailable.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -125,10 +125,7 @@ test('import has its own dialog that requests nothing on opening; imported art i
   assert.deepEqual(opening.filter((url) => /^\/(?:assets|media|fonts)\//.test(url) || /^\/data\//.test(url)), [],
     'opening the import dialog requests no art and no manifest');
   assert.equal(await page.$('.asset-download'), null, 'the download dialog stays closed');
-  assert.deepEqual(await page.evaluate(async () => ({
-    download: (await import('/js/assetDownload.js')).assetDownload.get().phase,
-    import: (await import('/js/assetPack.js')).assetImport.get().phase,
-  })), { download: 'idle', import: 'idle' });
+  assert.equal(await page.evaluate(async () => (await import('/js/assetPack.js')).assetImport.get().phase), 'idle');
   assert.ok(await page.$eval('.asset-import-dialog', (box) => box.contains(document.activeElement)), 'the dialog holds the focus');
 
   // a pack laid out like `node tools/package.mjs --assets`, through the dialog's zip picker
@@ -171,13 +168,8 @@ test('import has its own dialog that requests nothing on opening; imported art i
   await page.evaluate(() => fetch('/healthz?import-probe=1'));
   assert.ok(probes > beforeProbe, 'a non-asset URL still reaches the server');
 
-  await page.click('[data-testid="asset-download"]');
-  await page.waitForFunction(() => document.querySelector('[data-testid="asset-download-status"]')?.textContent.includes('1 个素材下载失败'));
-  assert.equal(counts.get(zipUrl) || 0, 0, 'download skips the imported zip file');
-  assert.equal(counts.get(folderUrl) || 0, 0, 'download skips the imported folder file');
-  assert.equal(counts.get(packUrl) || 0, 0, 'download skips the file of the pack');
-  assert.equal(counts.get(missing), 1);
-  assert.equal(await page.$('.asset-download .asset-import__row'), null, 'the download dialog has no import controls');
+  assert.equal(await page.$('[data-testid="asset-download"]'), null, 'only local import is offered');
+  assert.equal(counts.get(missing) || 0, 0, 'no unused art is downloaded in bulk');
 
   const insecure = await browser.newPage();
   await insecure.evaluateOnNewDocument(() => {

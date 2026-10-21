@@ -1,11 +1,10 @@
-// The title screen's 导入素材包 (docs/history/0.3.0.md §32.14.23, §32.14.39): its own button and dialog beside 下载完整素材
-// (ui/assetDownload.js), so a player who only imports never starts the server download.
+// The title screen’s only asset action: import a local asset pack without bulk server downloads.
 //
 // Opening the dialog reads nothing from the server: no art, not the manifests (assetPack.js reads the three served
-// manifests only once an import starts) and not the download queue. The dialog: a folder (showDirectoryPicker, else an
+// manifests only once an import starts) and no bulk asset transfer. The dialog: a folder (showDirectoryPicker, else an
 // <input webkitdirectory>) or a zip (a picker, or dropped), cancel, the counts, 清除已导入的素材 after a confirm, the
 // persist note, and why import is unavailable if browser local storage is missing. Closing it cancels a
-// running import; what was stored stays, and the download queue skips it (assetDownload.js).
+// running import; what was stored stays, and runtime loaders reuse it.
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Modal, ProgressBar, confirmDialog } from './components.js';
 import { assetImport } from '../assetPack.js';
