@@ -79,7 +79,12 @@ public final class LocalServerService extends Service {
             Process process = runtime.start(this, port);
             int code = process.waitFor();
             Log.w(TAG, "node exited: " + code);
-            if (!stopping) failure = "node exited (" + code + ")";
+            if (!stopping) {
+                // 输出由 drain 线程读，进程退出后稍等它读完最后几行
+                Thread.sleep(300);
+                String output = runtime.outputTail();
+                failure = "node exited (" + code + ")" + (output.isEmpty() ? "" : "\n" + output);
+            }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         } catch (Exception e) {

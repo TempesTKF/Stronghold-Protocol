@@ -15,6 +15,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -55,7 +56,11 @@ final class LocalRuntime {
         }
     }
 
+    /** 启动失败时随原因一起显示在首页的 node 输出行数（玩家手里多半没有 adb，看不到 logcat）。 */
+    private static final int TAIL_LINES = 12;
+
     private Process process;
+    private final ArrayDeque<String> tail = new ArrayDeque<>();
     private Context context;
     private Progress progress;
     private int extracted;
@@ -144,6 +149,13 @@ final class LocalRuntime {
         return process;
     }
 
+    /** node 最近的输出（最多 {@link #TAIL_LINES} 行），供退出时说明原因。 */
+    String outputTail() {
+        synchronized (tail) {
+            return String.join("\n", tail);
+        }
+    }
+
     void stop() {
         if (process != null) {
             Log.i(TAG, "node stop");
@@ -227,7 +239,14 @@ final class LocalRuntime {
             try {
                 BufferedReader reader = new BufferedReader(new InputStreamReader(target.getInputStream()));
                 String line;
-                while ((line = reader.readLine()) != null) Log.i(TAG, line);
+                while ((line = reader.readLine()) != null) {
+                    Log.i(TAG, line);
+                    if (line.trim().startsWith("at ")) continue;   // 堆栈帧只进 logcat，首页留给错误信息本身
+                    synchronized (tail) {
+                        if (tail.size() == TAIL_LINES) tail.removeFirst();
+                        tail.addLast(line);
+                    }
+                }
             } catch (IOException ignored) {
                 // 进程退出时读流异常，属正常
             }
