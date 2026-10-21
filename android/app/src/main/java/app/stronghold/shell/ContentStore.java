@@ -30,6 +30,9 @@ import java.util.zip.ZipInputStream;
  *
  * 一个 zip 里可以同时有两类内容，按条目路径分：
  *   素材：assets/…、fonts/…，或前面带 public/、&lt;任意一层&gt;/public/（完整发布包、setup 产物的布局）；
+ *         另有 data/local-assets.json、data/local-fx.json（可带一层前缀）——本地提取素材（assets/local/**：
+ *         3D 战场、官方特效、召唤物模型）的清单，存到 content/data/，链成 game/data/ 下的同名文件；
+ *         上游完整发布包 Stronghold-Protocol-v&lt;版本&gt;.zip 两样都有，可以原样导入；
  *   插件：其余 &lt;文件夹&gt;/… 中带 plugin.json 的文件夹（TKF 的 official-operator-skins.zip 就是 4 个这样的文件夹）。
  */
 final class ContentStore {
@@ -37,6 +40,9 @@ final class ContentStore {
     private static final String TAG = "StrongholdContent";
     private static final Pattern ART = Pattern.compile("^(?:(?:[^/]+/)?public/)?(assets|fonts)/(.+)$");
     private static final Pattern PLUGIN = Pattern.compile("^([A-Za-z0-9][A-Za-z0-9._-]*)/(.+)$");
+    /** 本地提取素材（public/assets/local/**：3D 战场、官方特效、召唤物模型…）的两份清单，服务器从 data/ 读。 */
+    private static final Pattern LOCAL_MANIFEST = Pattern.compile("^(?:[^/]+/)?data/(local-assets\\.json|local-fx\\.json)$");
+    private static final String[] LOCAL_MANIFESTS = {"local-assets.json", "local-fx.json"};
     private static final String ART_COUNT = ".art-files";
 
     interface Progress {
@@ -84,6 +90,10 @@ final class ContentStore {
         return new File(root(context), "plugins");
     }
 
+    private static File dataDir(Context context) {
+        return new File(root(context), "data");
+    }
+
     /** 已导入的插件（带 plugin.json 的文件夹名）。 */
     static List<String> plugins(Context context) {
         List<String> out = new ArrayList<>();
@@ -115,6 +125,7 @@ final class ContentStore {
         try {
             linkDir(assetsDir(context), new File(game, "public/assets"));
             linkDir(fontsDir(context), new File(game, "public/fonts"));
+            for (String name : LOCAL_MANIFESTS) linkFile(new File(dataDir(context), name), new File(game, "data/" + name));
             File gamePlugins = new File(game, "plugins");
             List<String> imported = plugins(context);
             File[] present = gamePlugins.listFiles();
@@ -146,6 +157,23 @@ final class ContentStore {
         }
         File parent = link.getParentFile();
         if (parent != null && !parent.isDirectory() && !parent.mkdirs()) throw new IOException("mkdirs " + parent);
+        Os.symlink(target.getPath(), link.getPath());
+    }
+
+    /** 同 linkDir，链的是单个文件（data/local-*.json）。 */
+    private static void linkFile(File target, File link) throws Exception {
+        boolean isLink = isLink(link);
+        if (!target.isFile()) {
+            if (isLink) link.delete();
+            return;
+        }
+        if (isLink) {
+            if (Os.readlink(link.getPath()).equals(target.getPath())) return;
+            link.delete();
+        } else if (link.exists()) {
+            Log.i(TAG, "keep bundled " + link);
+            return;
+        }
         Os.symlink(target.getPath(), link.getPath());
     }
 
@@ -185,8 +213,11 @@ final class ContentStore {
                 if (name.startsWith("__MACOSX/")) continue;   // macOS 打包附带的元数据
                 File target;
                 Matcher art = ART.matcher(name);
+                Matcher manifest = LOCAL_MANIFEST.matcher(name);
                 Matcher plugin = PLUGIN.matcher(name);
-                if (art.matches()) {
+                if (manifest.matches()) {
+                    target = new File(stagedArt, "data/" + manifest.group(1));
+                } else if (art.matches()) {
                     target = new File(stagedArt, art.group(1) + "/" + art.group(2));
                 } else if (plugin.matches() && !plugin.group(1).startsWith("_")) {
                     target = new File(stagedPlugins, plugin.group(1) + "/" + plugin.group(2));
@@ -225,6 +256,8 @@ final class ContentStore {
         // 素材：逐个文件并入（同名覆盖），一个素材包可以分几次导入
         result.artFiles = merge(new File(stagedArt, "assets"), assetsDir(context))
                 + merge(new File(stagedArt, "fonts"), fontsDir(context));
+        // 本地提取素材的清单与 assets/local/** 配套：新包里有就整份替换旧的
+        merge(new File(stagedArt, "data"), dataDir(context));
         LocalRuntime.deleteTree(staging);
         if (result.artFiles > 0) {
             int total = countFiles(assetsDir(context)) + countFiles(fontsDir(context));

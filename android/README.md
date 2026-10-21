@@ -87,6 +87,10 @@ bash android/tools/pack-assets.sh                # 可选：素材包 → androi
   也能导入：素材按文件读，插件目录变化服务器自己会重新扫描（桌面上用目录联接模拟验证过）。
   - 素材包：`android/tools/pack-assets.sh` 把 `public/assets` + `public/fonts` 打成不压缩的 zip（要和 APK
     同一版本：`data/assets.json` 在 APK 里）。不导入也能玩，画面用默认图形。
+  - 上游完整发布包 `Stronghold-Protocol-v<版本>.zip`（v0.3.1 为 845MB）可以原样导入：除了基础素材，还带维护者
+    本地提取的官方素材 `public/assets/local/**`（11 张 3D 战场场景、棋盘贴图、官方战斗特效、41 个召唤物模型等）
+    和它们的清单 `data/local-assets.json`、`data/local-fx.json`；清单存到 `content/data/`，链成 `game/data/`
+    下的同名文件。包里的代码、文档、依赖不要，暂存后丢弃。lite 包与 update 包不含素材。
   - 皮肤包：TKF v0.3.1 发布的 `official-operator-skins.zip`（404MB，4 个外观插件、274 套皮肤）原样导入即可；
     玩家在游戏的 设置 → 外观插件 里打开。
   - 「清除已导入」删掉 `content/` 并拆掉链接。这些都是官方美术，只供个人使用，不要分发。
