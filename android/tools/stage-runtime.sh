@@ -89,7 +89,8 @@ package_entry() {
 # 锁文件里的一行：「arch 包名 Filename SHA256」
 lock_entry() {
   [ -f "$LOCK_FILE" ] || return 1
-  awk -v a="$1" -v p="$2" '$1 == a && $2 == p { print $3, $4; found = 1; exit } END { exit !found }' "$LOCK_FILE"
+  # 去掉行尾 \r：core.autocrlf=true 的 Windows 检出会把锁文件换成 CRLF
+  awk -v a="$1" -v p="$2" '{ sub(/\r$/, "") } $1 == a && $2 == p { print $3, $4; found = 1; exit } END { exit !found }' "$LOCK_FILE"
 }
 
 # 取 InRelease 与 Packages，核对 Packages 的哈希（与可选的签名）；成功时打印所用镜像
