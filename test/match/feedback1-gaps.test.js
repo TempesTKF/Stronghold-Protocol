@@ -185,6 +185,7 @@ describe('§21.26 3 — strategies tied to a bond the mode switches off', () => 
         for (const h of [a, b]) {
           const offered = h.m.gd.bandIds();
           h.m.gd.bandIds = () => offered.filter((id) => id !== 'band_ioleta');
+          h.m.botTouchPolicy = 'legacy'; // no Touch priority either (botTouch.js)
         }
         assert.equal(botPickBand(a.m, a.m.order[0]), before(b.m), `${difficulty} seed ${seed}`);
         a.m.dispose();

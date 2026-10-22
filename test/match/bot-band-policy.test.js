@@ -1,4 +1,5 @@
-// Local owner rule (2026-10-15): AI opening strategies exclude 歌利亚 / 杜宾 and prefer 伊奥莱塔·罗素.
+// Local owner rule (2026-10-15): AI opening strategies exclude 歌利亚 / 杜宾 and prefer 伊奥莱塔·罗素, then Touch
+// (botTouchPolicy 'experimental', the default; 'legacy' keeps the weighted pick after 罗素).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHASE } from '../../shared/constants.js';
@@ -6,6 +7,7 @@ import { botPickBand } from '../../server/match/bot.js';
 import { makeMatch } from './harness.js';
 
 const PREFERRED = 'band_ioleta';
+const TOUCH = 'band_amedic';
 const BANNED = ['band_sarkazb', 'band_doberm'];
 const DIFFICULTIES = ['FUNNY', 'NORMAL', 'HARD', 'ABYSS'];
 
@@ -25,6 +27,7 @@ test('AI takes 伊奥莱塔·罗素 whenever free, in solo and co-op at every di
 
 test('when the preferred strategy is taken, all remaining eligible strategies are possible and banned ones never are', () => {
   const h = makeMatch({ humans: 2, difficulty: 'HARD', fake: true });
+  h.m.botTouchPolicy = 'legacy';
   const [human, bot] = h.m.order;
   try {
     h.m.draft = { picks: { [human.playerId]: PREFERRED } };
@@ -37,6 +40,41 @@ test('when the preferred strategy is taken, all remaining eligible strategies ar
     assert.deepEqual([...seen].sort(), ids.sort(), 'no extra exclusion in HARD');
     assert.equal(botPickBand(h.m, human), PREFERRED, 'a player does not exclude its own draft entry');
   } finally { h.m.dispose(); }
+});
+
+test('Touch is the second priority: taken when 罗素 is absent or taken, by one seeded draw; legacy draws', () => {
+  let checked = 0;
+  for (const difficulty of DIFFICULTIES) {
+    const h = makeMatch({ humans: 2, difficulty, fake: true });
+    const [human, bot] = h.m.order;
+    try {
+      assert.equal(h.m.botTouchPolicy, 'experimental', 'the default');
+      if (!h.m.gd.bandIds().includes(TOUCH)) continue;
+      checked++;
+      h.m.draft = { picks: { [human.playerId]: PREFERRED } };
+      for (const roll of [0, 0.5, 0.999999]) {
+        let draws = 0;
+        h.m.rngBots = () => { draws++; return roll; };
+        assert.equal(botPickBand(h.m, bot), TOUCH, difficulty + '/' + roll);
+        assert.equal(draws, 1, 'the Touch pick still consumes one seeded draw');
+      }
+      h.m.draft = { picks: {} };
+      h.m.rngBots = () => 0.5;
+      assert.equal(botPickBand(h.m, bot), PREFERRED, '罗素 first');
+      h.m.draft = { picks: { [human.playerId]: TOUCH } };
+      h.m.gd.bandIds = () => h.m.gd.constructor.prototype.bandIds.call(h.m.gd).filter((id) => id !== PREFERRED);
+      const seen = new Set();
+      for (let i = 0; i < 2000; i++) { h.m.rngBots = () => (i + 0.5) / 2000; seen.add(botPickBand(h.m, bot)); }
+      assert.ok(!seen.has(TOUCH) && seen.size > 1, 'Touch taken by a teammate: the weighted pick');
+      h.m.draft = { picks: { [human.playerId]: PREFERRED } };
+      delete h.m.gd.bandIds;
+      h.m.botTouchPolicy = 'legacy';
+      const legacy = new Set();
+      for (let i = 0; i < 2000; i++) { h.m.rngBots = () => (i + 0.5) / 2000; legacy.add(botPickBand(h.m, bot)); }
+      assert.ok(legacy.size > 1 && legacy.has(TOUCH), 'legacy: Touch only by the weighted draw');
+    } finally { h.m.dispose(); }
+  }
+  assert.ok(checked > 0, 'Touch is offered in some difficulty');
 });
 
 test('preferred absent from the mode offer: AI uses the remaining allowed strategy', () => {

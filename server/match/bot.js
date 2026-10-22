@@ -72,7 +72,8 @@
 //   6. resolve the temp slots (a 突变细胞 left there — it comes back after every transformation — gets a hand slot made
 //      for it, makeHandRoom, instead of being destroyed), keep one hand slot free (freeHandSlot: a kept bounty Art goes
 //      before a chess on a bot's own seat, never on a human's seat under AI 托管), then Ready.
-// Strategy (botPickBand): local owner rule (2026-10-15): never 歌利亚 / 杜宾; always 伊奥莱塔·罗素 when free. Otherwise
+// Strategy (botPickBand): local owner rule (2026-10-15): never 歌利亚 / 杜宾; always 伊奥莱塔·罗素 when free, then Touch
+// when free (botTouchPolicy 'experimental', the default; botTouch.js). Otherwise
 // weighted by starting LP among the offered, untaken bands; never one whose mechanic rides on a bond the
 // mode switches off (gd.bandBondIds = bands.json bondIds: the bond its text names in <…> or its blackboards name — 标准's
 // 潘格尼尼, 克莱门莎, 玛恩纳; DESIGN §21.26); alone, 老鲤's withheld first-round funds only rarely (× 0.02).
@@ -95,11 +96,21 @@ import { mitigate } from '../sim/damage.js';
 import { HOVER_KEYS } from '../sim/content/enemies.js';
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../shared/loadoutRecord.js';
 import { isIoleta, IOLETA_ELITE_VALUE, ioletaBuyBondBonus, ioletaBondScore, ioletaCanLevel } from './botIoleta.js';
+import { TOUCH_BAND, touchPolicyOn, placeTinmanInTouchRange } from './botTouch.js';
+import { TOUCH_POLICY, touchEnabled, touchItemPlan } from './botTouchPolicy.js';
 import { formationProfile, formationRole, formationValue, contactValue, resolveFormationMode } from './botFormation.js';
 import { botRefinement } from './botRefinements.js';
 import { experimentalEnabled, refreshExperimentalPlan, experimentalBuyBonus, experimentalBondScore,
   experimentalCore, experimentalCanLevel, experimentalTarget, experimentalSearchTargets,
   experimentalBondDisabled, EXPERIMENTAL_ELITE_VALUE } from './botIoletaExperimental.js';
+
+// The seat's shop policy: the experimental Ioleta hooks, or Touch's (botTouchPolicy.js, Match option botTouchPolicy);
+// null = the generic prep. Touch adds lineupBonus / itemBonus, which the Ioleta policy does not have.
+const IOLETA_EXPERIMENTAL_POLICY = Object.freeze({
+  refresh: refreshExperimentalPlan, buyBonus: experimentalBuyBonus, core: experimentalCore,
+  canLevel: experimentalCanLevel, target: experimentalTarget, searchTargets: experimentalSearchTargets,
+});
+const shopPolicy = (m, ps) => (experimentalEnabled(m, ps) ? IOLETA_EXPERIMENTAL_POLICY : touchEnabled(m, ps) ? TOUCH_POLICY : null);
 import { morphSlotPolicy, ruleOption } from '../../shared/plugins/rules.js';
 
 /**
@@ -154,8 +165,9 @@ const DEFAULT_MELEE_RANGE = [[0, 0], [0, 1]];
  * (DESIGN §21.26). [ASSUMED] A living teammate's opening strategy soft-reserves those bonds before anyone is deployed:
  * the weight stays positive, at a quarter of the unreserved weight, so the strategy can still be drawn, and the
  * reservation ends when that teammate is eliminated (alivePlayers). Local owner rule (2026-10-15): exclude 歌利亚
- * and 杜宾, and take 伊奥莱塔·罗素 whenever offered and untaken. Filter teammates' picks before drawing so neither
- * retries nor a generic first-free fallback can bypass this rule. With every band excluded, use the default only
+ * and 杜宾, and take 伊奥莱塔·罗素 whenever offered and untaken, then Touch (botTouchPolicy 'experimental').
+ * Filter teammates' picks before drawing so neither retries nor a generic first-free fallback can bypass this rule.
+ * With every band excluded, use the default only
  * while it is eligible. One rng draw per nonempty offer list (including a priority pick; deterministic per seed).
  */
 const SOFT_BAND_RESERVE = 0.25;
@@ -170,6 +182,8 @@ export function botPickBand(m, ps) {
   const ids = offered.filter(eligible);
   const roll = offered.length ? m.rngBots() : 0;
   if (ids.includes(BOT_PREFERRED_BAND)) return BOT_PREFERRED_BAND;
+  // Touch second (botTouchPolicy 'experimental', botTouch.js): 罗素 absent or taken; legacy keeps the weighted pick
+  if (touchPolicyOn(m) && ids.includes(TOUCH_BAND)) return TOUCH_BAND;
   if (!ids.length) return eligible(gd.defaultBandId) ? gd.defaultBandId : null;
   const lateFunds = (id) => /暂存/.test(String(gd.band(id)?.desc || ''));
   const reserved = new Set(ps && typeof m.alivePlayers === 'function'
@@ -207,7 +221,9 @@ export function botPickCard(m, ps, cards, available) {
     const c = cards[i];
     if (!c) continue;
     let s = 0;
-    if (c.kind === 'item') s = 8 + (c.tier || 1) * 4 + (canUseItem(m, ps, { id: c.id }) ? 0 : -8);
+    // + a strategy's item weight (shopPolicy itemBonus: Touch); the rng draws stay the same
+    if (c.kind === 'item') s = 8 + (c.tier || 1) * 4 + (canUseItem(m, ps, { id: c.id }) ? 0 : -8)
+      + (shopPolicy(m, ps)?.itemBonus?.(m, ps, c.id) || 0);
     else if (c.kind === 'bounty') s = bountyScore(m, ps, c);
     else if (c.kind === 'tactic') s = tacticScore(m, ps, c);
     s += m.rngBots() * 0.5;
@@ -586,7 +602,7 @@ function lineupScore(m, ps, set, ctx, handSlots = countFree(ps.hand)) {
   v -= Math.max(0, Math.min(2, ctx.roles.blockers) - blockers) * 15;
   if (ctx.fly > 0 && ctx.roles.antiAir > 0 && air === 0) v -= 12;
   v -= Math.max(0, healers - 2) * 10;
-  return v;
+  return v + (shopPolicy(m, ps)?.lineupBonus?.(m, ps, set) || 0);
 }
 
 /** Best deployable set of at most `cap` owned chess: greedy seed + swap hill-climbing on lineupScore. */
@@ -657,8 +673,9 @@ function buyScore(m, ps, id, ctx) {
   if (ctx.model && !isHealer(c)) s += ARMOR_WEIGHT * 0.6 * (armorFit(ctx.model, c) - 0.6);
   // the player's own 自选 piece (a slotted slot: its composed record carries diyFor) — AI 托管 of a human with picks
   if (c.diyFor) s += DIY_PIECE_BONUS;
-  if (experimentalEnabled(m, ps)) {
-    s += experimentalBuyBonus(m, ps, id, ctx);
+  const policy = shopPolicy(m, ps);
+  if (policy) {
+    s += policy.buyBonus(m, ps, id, ctx);
   } else if (isIoleta(ps)) {
     // Upstream legacy tie preferences for offered cards; no targeted refresh incentive.
     if (!ctx.owned.bases.has(base)) s += ioletaBuyBondBonus(gd, c, ctx.owned);
@@ -1531,9 +1548,8 @@ function context(m, ps) {
   let pairs = 0;
   for (const [b, k] of copies) if (k + 1 >= mergeNeed(m, b)) pairs++;
   const keep = keeperBases(m, ps, plan);
-  if (experimentalEnabled(m, ps)) {
-    for (const p of ps.allChess()) if (experimentalCore(m, ps, p.id)) keep.add(m.gd.baseIdOf(p.id));
-  }
+  const policy = shopPolicy(m, ps);
+  if (policy) for (const p of ps.allChess()) if (policy.core(m, ps, p.id)) keep.add(m.gd.baseIdOf(p.id));
   return { ps, owned, focus: plan.focus, second: plan.second, keep, copies, pairs, roles: roles(m, ps), fly: model.flyTotal, model };
 }
 
@@ -1653,7 +1669,8 @@ function takeOffers(m, ps) {
     let bestS = -Infinity;
     offer.slots.forEach((s, i) => {
       if (s.sold) return;
-      const sc = s.kind === 'item' ? (canUseItem(m, ps, s) ? 10 : 1) + gd.tierOf(s.id) * 3 : buyScore(m, ps, s.id, ctx);
+      const sc = s.kind === 'item' ? (canUseItem(m, ps, s) ? 10 : 1) + gd.tierOf(s.id) * 3
+        + (shopPolicy(m, ps)?.itemBonus?.(m, ps, s.id) || 0) : buyScore(m, ps, s.id, ctx);
       if (sc > bestS) { bestS = sc; best = i; }
     });
     if (best < 0) break;
@@ -1683,7 +1700,7 @@ export function botPrepBegin(m, ps) {
  */
 export function* botPrepBeginSteps(m, ps, { delegate = false } = {}) {
   if (!ps.alive || ps.ready) return null;
-  if (experimentalEnabled(m, ps)) refreshExperimentalPlan(m, ps);
+  shopPolicy(m, ps)?.refresh(m, ps);
   m.autoPickPersonalChoice(ps, 'bot');
   // 1. reward offers (free)
   takeOffers(m, ps);
@@ -1707,7 +1724,9 @@ export function* botPrepBeginSteps(m, ps, { delegate = false } = {}) {
   yield* arrangeSteps(m, ps);
   equipItems(m, ps);
   yield;
-  return yield* arrangeSteps(m, ps, { final: true, defer: true, delegate });
+  const job = yield* arrangeSteps(m, ps, { final: true, defer: true, delegate });
+  placeTinmanInTouchRange(m, ps); // Touch: 锡人 into the heal range (botTouch.js; nothing for other seats)
+  return job;
 }
 
 /** Prep routine, end: the rehearsed layout (when it beat the default plan), temp, a free hand slot, Ready. */
@@ -1719,6 +1738,7 @@ export function botPrepEnd(m, ps, job = null) {
 export function* botPrepEndSteps(m, ps, job = null) {
   if (!ps.alive || ps.ready) return;
   if (job && job.done && job.best !== job.plans[0]) yield* applyPlanSteps(m, ps, job.chosen, job.best);
+  placeTinmanInTouchRange(m, ps); // again after a rehearsed layout
   // 5. temp → hand / sell / destroy; keep one hand slot free for next round's merges
   resolveTemp(m, ps);
   if (freeSlot(ps.hand) < 0) freeHandSlot(m, ps);
@@ -1754,8 +1774,9 @@ export function botPrep(m, ps) {
  */
 function maybeFreeze(m, ps) {
   if (ps.shop.frozen) return;
+  const policy = shopPolicy(m, ps);
   if (ps.shop.slots.some((s) => s && !s.sold && s.kind === 'chess' && ps.priceOf(s) > ps.funds && ps.completesChessMerge(s.id)
-    && (!experimentalEnabled(m, ps) || experimentalCore(m, ps, s.id) || buyScoreOf(m, ps, s.id) >= 60))) tryDo(() => ps.freeze());
+    && (!policy || policy.core(m, ps, s.id) || buyScoreOf(m, ps, s.id) >= 60))) tryDo(() => ps.freeze());
 }
 
 /** Whether level `lv` of the 调度中心 opens one of the player's slotted 自选 pieces with copies left (player/diy.js). */
@@ -1769,10 +1790,11 @@ export function diyOpensAt(ps, lv) {
 /** The 调度中心 level-ups of a bot's prep (exported for tests). */
 export function levelUp(m, ps, { spare = false } = {}) {
   const gd = ps?.gd || m.gd;
-  if (experimentalEnabled(m, ps)) {
-    if (!experimentalCanLevel(m, ps) || ps.offers.length) return;
+  const policy = shopPolicy(m, ps);
+  if (policy) {
+    if (!policy.canLevel(m, ps) || ps.offers.length) return;
     if (ps.shop.slots.some(s => s && !s.sold && s.kind === 'chess' && ps.priceOf(s) <= ps.funds
-      && ps.completesChessMerge(s.id) && experimentalCore(m, ps, s.id))) return;
+      && ps.completesChessMerge(s.id) && policy.core(m, ps, s.id))) return;
     // One step per pass: no free-upgrade cascade past the next stage's core targets.
     tryDo(() => ps.levelUp());
     return;
@@ -1816,8 +1838,9 @@ function fundsReserve(m, ps) {
 
 /** [ASSUMED] Experiment-only proxy for safely delaying an optional merge; no future-wave oracle. */
 export function deferExperimentalMerge(m, ps, purchasePrice = 0) {
-  if (!experimentalEnabled(m, ps) || ps.shop.level >= 4 || ps.lp <= 10 || ps.deployCount < ps.deployCap) return false;
-  if (!experimentalCanLevel(m, ps) || ps.funds < Math.max(0, ps.shop.upgradePrice) + purchasePrice) return false;
+  const policy = shopPolicy(m, ps);
+  if (!policy || ps.shop.level >= 4 || ps.lp <= 10 || ps.deployCount < ps.deployCap) return false;
+  if (!policy.canLevel(m, ps) || ps.funds < Math.max(0, ps.shop.upgradePrice) + purchasePrice) return false;
   const previous = m.lastResults.get(ps.playerId);
   return !!previous && !(previous.leaked || []).some(l => l.counted !== false);
 }
@@ -1828,13 +1851,14 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
   let refreshes = 0;
   const minPrice = 2;
   const reserve = fundsReserve(m, ps);
-  const experimental = experimentalEnabled(m, ps);
+  const policy = shopPolicy(m, ps);
+  const custom = !!policy;
   // the best lineup is reused while the owned chess stay the same (a refresh changes only the shop)
   let memo = null;
   for (let guard = 0; guard < 40; guard++) {
     if (guard > 0) yield;
     if (isIoleta(ps)) takeOffers(m, ps); // a merge reward can enable another merge before upgrading
-    if (experimental && !fillOnly && experimentalCanLevel(m, ps)) {
+    if (custom && !fillOnly && policy.canLevel(m, ps)) {
       const oldLevel = ps.shop.level;
       levelUp(m, ps);
       if (ps.shop.level !== oldLevel) { memo = null; continue; }
@@ -1876,16 +1900,16 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
         const merges = ps.completesChessMerge(s.id);
         if (freeSlot(ps.hand) < 0 || (mergesOnly && !merges)) return;
         const base = gd.baseIdOf(s.id);
-        const core = experimental && experimentalCore(m, ps, s.id);
-        if (experimental) {
-          if (fillOnly && !merges && experimentalCanLevel(m, ps)) return;
-          const target = experimentalTarget(m, ps, s.id);
+        const core = custom && policy.core(m, ps, s.id);
+        if (custom) {
+          if (fillOnly && !merges && policy.canLevel(m, ps)) return;
+          const target = policy.target(m, ps, s.id);
           const hasElite = ps.allChess().some(p => gd.baseIdOf(p.id) === base && gd.isGolden(p.id));
           if (!gd.isGolden(s.id) && (hasElite || (target?.copies === 1 && ctx.owned.bases.has(base)))) return;
           // [ASSUMED] Delay a healthy optional merge only for a concrete, affordable upgrade.
           // A planned upgrade is performed above before the third copy is purchased.
           if (merges && !core && deferExperimentalMerge(m, ps, price)) return;
-          if (fillOnly && !core && experimentalCanLevel(m, ps)
+          if (fillOnly && !core && policy.canLevel(m, ps)
             && (!merges || ps.funds >= Math.max(0, ps.shop.upgradePrice) + price)) return;
         }
         if (boardFull && !merges && ps.funds - price < reserve) return; // banked (坎诺特)
@@ -1908,16 +1932,18 @@ function* buyLoopSteps(m, ps, { fillOnly = false, maxRefreshes = 0 } = {}) {
         if (!boardFull) sc += 8;
       } else {
         if (fillOnly) return;
-        if (experimental && (experimentalCanLevel(m, ps) || (experimentalSearchTargets(m, ps).length && canRefresh))) return;
+        // a strategy's wanted item (policy.itemBonus: Touch) is bought even while it levels or searches
+        const itemBonus = policy?.itemBonus?.(m, ps, s.id) || 0;
+        if (custom && !itemBonus && (policy.canLevel(m, ps) || (policy.searchTargets(m, ps).length && canRefresh))) return;
         if (!canUseItem(m, ps, { id: s.id })) return;
         if (freeSlot(ps.hand) < 0) return;
         if (ps.funds - price < reserve && !ps.completesItemMerge(s.id)) return;
         const carriers = [...ps.board.values()].filter((p) => p.kind === 'chess' && slotFree(m, ps, p, gd.item(s.id))).length;
-        if (!carriers) return;
-        sc = 6 + (gd.tierOf(s.id) || 1) * 3 - price + (ps.completesItemMerge(s.id) ? 10 : 0);
+        if (!carriers && !itemBonus) return;
+        sc = 6 + (gd.tierOf(s.id) || 1) * 3 - price + (ps.completesItemMerge(s.id) ? 10 : 0) + itemBonus;
       }
       const merges = s.kind === 'chess' && ps.completesChessMerge(s.id)
-        && (!experimental || experimentalCore(m, ps, s.id));
+        && (!custom || policy.core(m, ps, s.id));
       const mergeFirst = isIoleta(ps) && merges !== bestMerges;
       const betterScore = sc > bestS + 1e-9 || (best >= 0 && Math.abs(sc - bestS) <= 1e-9 && price < bestPrice);
       if (mergeFirst ? merges : betterScore) { bestS = sc; best = i; bestMerges = merges; bestPrice = price; }
@@ -2284,7 +2310,10 @@ function equipItems(m, ps) {
     const ctx = context(m, ps);
     const rec = gd.item(item.id);
     if (rec && rec.itemType === 'MAGIC') { useArt(m, ps, item, ctx); continue; }
-    const target = itemTarget(m, ps, item, ctx);
+    // Touch: its favoured items on 锡人, or held for one (botTouchPolicy.js touchItemPlan)
+    const plan = touchItemPlan(m, ps, item, (p, r) => slotFree(m, ps, p, r));
+    if (plan?.hold) continue;
+    const target = plan?.carrier || itemTarget(m, ps, item, ctx);
     if (!target) continue;
     tryDo(() => ps.equip(item.uid, target.uid));
   }

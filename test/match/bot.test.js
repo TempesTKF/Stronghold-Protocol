@@ -533,6 +533,7 @@ test('band pick: alone, the bot avoids a band that withholds the first rounds\' 
       const h = makeMatch({ mode, difficulty: 'NORMAL', seats: [{ seat: 0, playerId: 'ai_0', name: 'AI', isBot: true, connected: true }], seed, fake: true });
       const offered = h.m.gd.bandIds();
       h.m.gd.bandIds = () => offered.filter((id) => id !== 'band_ioleta'); // weighted fallback, priority unavailable
+      h.m.botTouchPolicy = 'legacy'; // no Touch priority either (botTouch.js)
       if (botPickBand(h.m, h.m.order[0]) === 'band_lmlee') counts[mode]++;
       h.m.dispose();
     }
