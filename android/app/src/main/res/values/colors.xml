@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 图标底色 / 前景：沿用上游 PWA 图标的薄荷绿城堡配色。 -->
+    <color name="ic_launcher_background">#10201A</color>
+    <color name="launcher_mint">#7BD9A5</color>
+    <color name="launcher_gate">#10201A</color>
+</resources>
