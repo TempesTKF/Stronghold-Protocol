@@ -58,6 +58,7 @@ test('#514: strategy selection stays possible, and less likely, while a teammate
     // Exercise the weighted fallback after the local priority strategy is unavailable.
     const offered = m.gd.bandIds();
     m.gd.bandIds = () => offered.filter((id) => id !== 'band_ioleta');
+    m.botTouchPolicy = 'legacy'; // no Touch priority either (botTouch.js)
     const tally = (id, n = 400) => {
       let hits = 0;
       for (let i = 0; i < n; i++) if (botPickBand(m, bot) === id) hits++;

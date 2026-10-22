@@ -150,6 +150,7 @@
 //   opts.timerScale    multiplier on every real-time phase timer (default 1)
 //   opts.combatSpeed   game seconds per real second while battles run in real time (default 2, the forced 2×)
 //   opts.botIoletaPolicy  'experimental' (default) or 'legacy'; only affects Ioleta bots / AI takeover.
+//   opts.botTouchPolicy  'experimental' (default) or 'legacy'; experimental: the AI band pick takes Touch after 罗素.
 //   opts.botFormationMode  explicit formation override; omitted selects adaptive for experimental Ioleta, learned otherwise.
 //   opts.botFormationEnabled  false disables taught/adaptive layouts independently of the purchase policy.
 //   opts.botRehearsal  candidate layouts a bot simulates per prep before placing (default 3, 0 = heuristic only;
@@ -326,6 +327,7 @@ export class Match {
     this.gameSpeed = Number.isFinite(opts.combatSpeed) && opts.combatSpeed > 0 ? Math.min(opts.combatSpeed, 200) : GAME_SPEED;
     // Proposed Ioleta default; explicit legacy policy/formation overrides remain available.
     this.botIoletaPolicy = opts.botIoletaPolicy ?? 'experimental';
+    this.botTouchPolicy = opts.botTouchPolicy ?? 'experimental';
     this.botFormationMode = opts.botFormationMode ?? null;
     this.botFormationEnabled = opts.botFormationEnabled !== false;
     /** layouts a bot rehearses per prep with the real simulation (bot.js; 0 = heuristic placement only) */
