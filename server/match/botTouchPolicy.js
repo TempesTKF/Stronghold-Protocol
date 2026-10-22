@@ -48,6 +48,10 @@ export const isSolvent = (id) => String(id).startsWith(TOUCH_ITEMS[0]);
 const GOALS = Object.freeze({ steadShip: 3, preciShip: 3, swiftShip: 2 });
 const WEIGHT = { steadShip: 12, preciShip: 10, swiftShip: 8 };
 
+// [ASSUMED] The shop part (purchases, level-ups, searches, item and lineup weights: TOUCH_POLICY) is off for now
+// (2026-10-22): a Touch seat buys and levels like the generic bot; the band pick, item carriers and the 锡人 move stay.
+export const TOUCH_SHOP_ON = false;
+
 export const touchEnabled = (m, ps) => m?.botTouchPolicy === 'experimental' && ps?.bandId === 'band_amedic';
 
 // public match information: the mode's static exclusions and the drawn disabled bonds
@@ -274,7 +278,7 @@ export function touchItemPlan(m, ps, item, hasRoom) {
   const carrier = tinmen(gd, ps).filter((p) => hasRoom(p, rec) && !(isSolvent(item.id) && wearsSolvent(p)))
     .sort((a, b) => rank(b) - rank(a) || a.uid - b.uid)[0];
   if (carrier) return { carrier };
-  return touchHoldItem(m, ps, item.id) ? { hold: true } : null;
+  return TOUCH_SHOP_ON && touchHoldItem(m, ps, item.id) ? { hold: true } : null;
 }
 
 const TOUCH_TOKEN = 'char_613_acmedc';

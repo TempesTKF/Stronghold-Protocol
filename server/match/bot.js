@@ -97,7 +97,7 @@ import { HOVER_KEYS } from '../sim/content/enemies.js';
 import { attackRangeGrid, loadoutRecord, resolveRecordLoadout } from '../../shared/loadoutRecord.js';
 import { isIoleta, IOLETA_ELITE_VALUE, ioletaBuyBondBonus, ioletaBondScore, ioletaCanLevel } from './botIoleta.js';
 import { TOUCH_BAND, touchPolicyOn, placeTinmanInTouchRange } from './botTouch.js';
-import { TOUCH_POLICY, touchEnabled, touchItemPlan } from './botTouchPolicy.js';
+import { TOUCH_POLICY, TOUCH_SHOP_ON, touchEnabled, touchItemPlan } from './botTouchPolicy.js';
 import { formationProfile, formationRole, formationValue, contactValue, resolveFormationMode } from './botFormation.js';
 import { botRefinement } from './botRefinements.js';
 import { experimentalEnabled, refreshExperimentalPlan, experimentalBuyBonus, experimentalBondScore,
@@ -110,7 +110,7 @@ const IOLETA_EXPERIMENTAL_POLICY = Object.freeze({
   refresh: refreshExperimentalPlan, buyBonus: experimentalBuyBonus, core: experimentalCore,
   canLevel: experimentalCanLevel, target: experimentalTarget, searchTargets: experimentalSearchTargets,
 });
-const shopPolicy = (m, ps) => (experimentalEnabled(m, ps) ? IOLETA_EXPERIMENTAL_POLICY : touchEnabled(m, ps) ? TOUCH_POLICY : null);
+const shopPolicy = (m, ps) => (experimentalEnabled(m, ps) ? IOLETA_EXPERIMENTAL_POLICY : touchEnabled(m, ps) && TOUCH_SHOP_ON ? TOUCH_POLICY : null);
 import { morphSlotPolicy, ruleOption } from '../../shared/plugins/rules.js';
 
 /**

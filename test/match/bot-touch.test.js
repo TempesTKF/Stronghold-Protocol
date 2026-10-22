@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SharedPool } from '../../server/match/pool.js';
-import { TOUCH_OPS as O, TOUCH_PARAMS, refreshTouchPlan, touchTarget, touchCore, touchBuyBonus, touchCanLevel,
+import { TOUCH_OPS as O, TOUCH_PARAMS, TOUCH_SHOP_ON, refreshTouchPlan, touchTarget, touchCore, touchBuyBonus, touchCanLevel,
   touchEnabled, touchItemBonus, touchItemPlan, touchLineupBonus, touchHealKeys, touchTile, touchTinmanMove } from '../../server/match/botTouchPolicy.js';
 import { placeTinmanInTouchRange } from '../../server/match/botTouch.js';
 import { botPickCard } from '../../server/match/bot.js';
@@ -99,7 +99,8 @@ test('touch: 源石溶剂 is held for 锡人, then one per 锡人; the attack it
   assert.equal(touchItemBonus(m, ps, DAGGER), 0);
   add(m, ps, 'chess_char_6_19_a', { board: true });
   const solvent = giveItem(m, ps, SOLVENT);
-  assert.deepEqual(touchItemPlan(m, ps, solvent, room(m)), { hold: true }, 'kept for 锡人');
+  // the hold belongs to the shop part (TOUCH_SHOP_ON); with it off the generic target takes the item
+  assert.deepEqual(touchItemPlan(m, ps, solvent, room(m)), TOUCH_SHOP_ON ? { hold: true } : null, 'kept for 锡人 only with the shop part');
   assert.equal(touchItemPlan(m, ps, giveItem(m, ps, 'chess_item_1_01_e_a'), room(m)), null, 'not a favoured item');
   const tin = add(m, ps, O.tinman, { elite: true, board: true });
   assert.equal(touchItemPlan(m, ps, solvent, room(m)).carrier.uid, tin.uid);
@@ -109,11 +110,11 @@ test('touch: 源石溶剂 is held for 锡人, then one per 锡人; the attack it
   assert.notEqual(touchItemPlan(m, ps, giveItem(m, ps, SOLVENT), room(m))?.carrier?.uid, tin.uid);
 });
 
-test('touch: 机变 prefers 源石溶剂 over an item card the generic bot would take; legacy does not', (t) => {
+test('touch: 机变 prefers 源石溶剂 over an item card the generic bot would take (shop part on); legacy does not', (t) => {
   const { m, ps } = setup(t);
   add(m, ps, O.tinman, { board: true });
   const cards = [{ kind: 'item', id: 'chess_item_3_01_e_a', tier: 3 }, { kind: 'item', id: SOLVENT, tier: 1 }];
-  assert.equal(botPickCard(m, ps, cards, [0, 1]), 1);
+  assert.equal(botPickCard(m, ps, cards, [0, 1]), TOUCH_SHOP_ON ? 1 : 0, 'the shop part weighs 机变 items');
   m.botTouchPolicy = 'legacy';
   assert.equal(botPickCard(m, ps, cards, [0, 1]), 0);
 });
