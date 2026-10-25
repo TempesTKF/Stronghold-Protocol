@@ -249,6 +249,7 @@ node tools/perfbench.mjs --cpu 1,4,6 --profile             # 真实战斗的帧�
 | `scripts/` | 启动脚本（Windows / macOS / Linux）、Windows 开机自启 |
 | `docs/` | 文档与调研 |
 | `test/` | `node:test` 测试 |
+| `android/` | Android 外壳：把浏览器客户端装进 WebView（JDK + Android SDK 直接构建，不需要 Gradle），见 [android/README.md](android/README.md) |
 
 ## 许可证
 
