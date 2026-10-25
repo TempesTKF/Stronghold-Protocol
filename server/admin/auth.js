@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n.js';
 import { randomBytes, scrypt as derive, timingSafeEqual } from 'node:crypto';
 import { promisify } from 'node:util';
 const scrypt = promisify(derive);
@@ -19,13 +20,13 @@ export function createAdminAuth(record) {
     async login(password, ip) {
       prune();
       const attempt = attempts.get(ip) || { count: 0, until: Date.now() + 15 * 60_000 };
-      if (attempt.count >= 5 || working >= 2 || attempts.size >= 2048) return { status: 429, error: '登录尝试过多，请稍后再试' };
+      if (attempt.count >= 5 || working >= 2 || attempts.size >= 2048) return { status: 429, error: t('登录尝试过多，请稍后再试') };
       attempt.count++; attempts.set(ip, attempt);
-      if (typeof password !== 'string' || password.length > 256) return { status: 401, error: '密码错误' };
+      if (typeof password !== 'string' || password.length > 256) return { status: 401, error: t('密码错误') };
       working++;
       try {
         const key = await scrypt(password, record.salt, 64);
-        if (!timingSafeEqual(key, Buffer.from(record.hash, 'hex'))) return { status: 401, error: '密码错误' };
+        if (!timingSafeEqual(key, Buffer.from(record.hash, 'hex'))) return { status: 401, error: t('密码错误') };
       } finally { working--; }
       attempts.delete(ip);
       if (sessions.size >= 64) sessions.delete(sessions.keys().next().value);

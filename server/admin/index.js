@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n.js';
 // Owner console on its own HTTP listener. Bearer sessions, never cross-port cookies.
 import http from 'node:http';
 import fs from 'node:fs';
@@ -80,7 +81,7 @@ export function createAdmin({ options, root, registry, lobby, network, startedAt
       res.writeHead(200, { 'Content-Type': `${type}; charset=utf-8`, 'Cache-Control': 'no-store' });
       res.end(fs.readFileSync(path.join(UI, file))); return;
     }
-    if (!raw.startsWith('/api/')) { json(res, 404, { error: '不存在' }); return; }
+    if (!raw.startsWith('/api/')) { json(res, 404, { error: t('不存在') }); return; }
     // NAT changes the port, not the browser's Host header. No permissive CORS.
     const origin = req.headers.origin;
     let same = false;
@@ -105,7 +106,7 @@ export function createAdmin({ options, root, registry, lobby, network, startedAt
     else if (raw === '/api/room/close') {
       const room = lobby.rooms.get(input.code);
       if (!room || room.disposed) throw adminError(404, '房间已不存在');
-      state.record(`关闭房间 ${room.code}`);
+      state.record(t('关闭房间 {code}', { code: room.code }));
       lobby.disposeRoom(room, 'admin');
     } else if (raw === '/api/player/kick' || raw === '/api/ban/add') {
       const session = registry.byId(input.id);
@@ -114,14 +115,14 @@ export function createAdmin({ options, root, registry, lobby, network, startedAt
         if (typeof input.reason !== 'string' || input.reason.length > 300 || typeof input.withIp !== 'boolean') throw adminError(400, '无效封禁参数');
         state.ban(session, input.reason.trim(), input.withIp);
         for (const other of [...registry.all()]) if (other === session || (input.withIp && other.addr === session.addr)) disconnect(other);
-      } else { state.record(`踢出玩家 ${session.playerId}`); disconnect(session); }
-    } else throw adminError(404, '不存在');
+      } else { state.record(t('踢出玩家 {playerId}', { playerId: session.playerId })); disconnect(session); }
+    } else throw adminError(404, t('不存在'));
     json(res, 200, { ok: true, revision: state.get().revision });
   }
   const server = http.createServer((req, res) => {
     handle(req, res).catch(error => {
       if (!error.status) log.error('[admin] request failed', error);
-      if (!res.headersSent) json(res, error.status || 500, { error: error.status ? error.message : '服务器操作失败' });
+      if (!res.headersSent) json(res, error.status || 500, { error: error.status ? error.message : t('服务器操作失败') });
       else res.destroy();
     });
   });

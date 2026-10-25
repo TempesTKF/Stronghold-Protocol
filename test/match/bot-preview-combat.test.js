@@ -1,10 +1,10 @@
 // Upstream c24e17ee real-battle rehearsal regression, adapted to opt-in local refinements.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rehearse } from '../../server/match/bot.js';
+import { rehearse } from '../../server/match/botOwner.js';
 import { buildNormalWave } from '../../server/match/waves.js';
 import { parseKey } from '../../server/match/board.js';
-import { makeMatch, give, checkInvariants } from './harness.js';
+import { makeOwnerMatch as makeMatch, give, checkInvariants } from './harness.js';
 test('user: Given normal battle-start effects, When rehearsing candidate layouts, Then choose the layout with fewer actual battle leaks', async (t) => {
   // Real round-7 wave from seed 104; no equipment, bench, effects or prior layers are needed.
   // Blemishine also gains Kazimierz layers in battle; Touch is supplied by the teammate's contentInfo.

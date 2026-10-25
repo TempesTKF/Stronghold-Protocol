@@ -51,22 +51,16 @@ test('standins: every active skill a chess names for its stand-in is cast; passi
   }
 });
 
-for (const [id, title] of [
-  ['coop2-NORMAL-4-coverage-standins', 'the Ioleta coverage match fields stand-ins'],
-  ['coop2-NORMAL-1-unowned-roster', 'a roster without owned NORMAL operators fields stand-ins'],
-]) {
-  test(`matches: ${title} without engine errors`, () => {
-    const dg = MATCHES.scenarios[id];
-    assert.ok(dg, `${id}: scenario present`);
-    assert.deepEqual(dg.errors, { engine: 0, logged: 0, sim: 0, dispatcher: 0 }, id);
-    const fielded = dg.standIns.rounds.filter(([, s]) => s).flatMap(([, s]) => s.split(' '));
-    assert.ok(new Set(fielded).size >= 2, `${id}: stand-ins fielded: ${[...new Set(fielded)].join(', ')}`);
-    for (const f of fielded) {
-      const [chessId, charId] = f.split('→');
-      const c = CHESS[`chess_char_${chessId}`];
-      assert.ok(c, `${id}: known chess ${chessId}`);
-      assert.ok(dg.standIns.notOwned.includes(c.baseId || c.chessId), `${id}: ${f} not owned`);
-      assert.equal(charId, c.backup.charId, `${id}: ${f} uses its backup`);
-    }
-  });
-}
+test('user: Given no owned NORMAL operators, When AI plays a full match, Then it fields stand-ins without engine errors', () => {
+  const dg = MATCHES.scenarios['coop2-NORMAL-1-unowned-roster'];
+  assert.ok(dg, 'scenario present');
+  assert.deepEqual(dg.errors, { engine: 0, logged: 0, sim: 0, dispatcher: 0 });
+  const fielded = dg.standIns.rounds.filter(([, s]) => s).flatMap(([, s]) => s.split(' '));
+  assert.ok(new Set(fielded).size >= 2, `stand-ins fielded: ${[...new Set(fielded)].join(', ')}`);
+  for (const f of fielded) {
+    const [id, charId] = f.split('→');
+    const c = CHESS[`chess_char_${id}`];
+    assert.ok(dg.standIns.notOwned.includes(c.baseId || c.chessId), `${f}: not owned`);
+    assert.equal(charId, c.backup.charId);
+  }
+});

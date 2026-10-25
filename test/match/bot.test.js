@@ -1,14 +1,14 @@
-// AI player (server/match/bot.js): field model, layout planner, rehearsal, buying / leveling / bench management.
+// AI player (server/match/botOwner.js): field model, layout planner, rehearsal, buying / leveling / bench management.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildNormalWave } from '../../server/match/waves.js';
 import { PHASE } from '../../shared/constants.js';
-import { fieldModel, planLayout, rehearse, createRehearsalSteps, rangeTiles, REHEARSAL_VARIANTS, LAYOUT_PARAMS, botPickCard, botPickBand } from '../../server/match/bot.js';
+import { fieldModel, planLayout, rehearse, createRehearsalSteps, rangeTiles, REHEARSAL_VARIANTS, LAYOUT_PARAMS, botPickCard, botPickBand } from '../../server/match/botOwner.js';
 import { createRegistry } from '../../server/match/effectsMeta.js';
 import { registerMeta, registerExtensionMeta, resetExtensions } from '../../server/sim/content/extensions.js';
 import { budgetUsed, charge, DEFAULT_BUDGET } from '../../server/sim/content/dsl/budget.js';
 import { FIELD, canPlace, placeClass, parseKey, legalTiles, tileKey } from '../../server/match/board.js';
-import { makeMatch, checkInvariants, give, giveItem, DATA } from './harness.js';
+import { makeOwnerMatch as makeMatch, checkInvariants, give, giveItem, DATA } from './harness.js';
 import { makeBattle } from '../helpers/battleHarness.js';
 
 const soloBot = (o = {}) => makeMatch({ mode: 'solo', difficulty: 'NORMAL', seats: [{ seat: 0, playerId: 'ai_0', name: 'AI', isBot: true, connected: true }], ...o });
@@ -627,6 +627,8 @@ for (const plugin of [false, true]) test(`rehearsal capabilities: ${plugin ? 'pl
     ps.temp[0] = temp;
     ps._tempDue.set(temp.uid, ps.prepsEnded);
     ps.effects.push({ id: 'preview-state', key: 'effect:preview-state', battle: true, data: { value: 1 }, params: { value: 1 } });
+    // 鸭爵's swaps are one draw per round from the match seed (GitHub #839): take a match seed whose R7 draw swaps
+    for (let k = 0; k < 50 && !m._normalOpts(ps, { preview: true }).spawns.some((s) => s.tag === 'duck'); k++) m.seed++;
     let calls = 0;
     const draws = [];
     const handler = { onBattleStart(ctx, ev) {

@@ -3,8 +3,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { PHASE } from '../../shared/constants.js';
-import { botPickBand } from '../../server/match/bot.js';
-import { makeMatch } from './harness.js';
+import { botPickBand } from '../../server/match/botOwner.js';
+import { makeOwnerMatch as makeMatch } from './harness.js';
 
 const PREFERRED = 'band_ioleta';
 const TOUCH = 'band_amedic';

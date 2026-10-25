@@ -473,3 +473,12 @@ test('real HTTP/WebSocket flow: hidden keys, public entry, cancel, immediate mat
   await guest.waitFor('match.state', m => m.reason === 'created');
   assert.equal((await directory()).rooms[0].number, '0002');
 });
+
+
+test('matchmaking never joins a room of a different official version', t => {
+  const { lobby, player, create } = fixture(t);
+  const room = create(player());
+  room.version = 'act1autochess';
+  assert.equal(lobby.matchmaking.findRoom(room.difficulty), null);
+  assert.equal(lobby.matchmaking.findRoom(room.difficulty, 'act1autochess'), room);
+});

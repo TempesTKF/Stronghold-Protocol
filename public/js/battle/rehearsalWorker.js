@@ -9,7 +9,7 @@
 //
 //   postMessage → { t: 'ready' }                                        once, when this script has been evaluated
 //   onmessage ← { t: 'data', raw }                                      the page's /data/*.json (once, before any task)
-//             ← { t: 'rehearsal', taskId, playerId, cap, specs, stage?, tickBudget? }   one bot prep's candidates
+//             ← { t: 'rehearsal', taskId, playerId, cap, specs }         one bot prep's candidates
 //   postMessage → { t: 'done', taskId, choice } | { t: 'error', taskId, message }
 //
 // A candidate whose Battle cannot be built is skipped: the server's own rehearsal gets a finished stand-in for it and
@@ -21,14 +21,14 @@
 // public/ path a static import could resolve — public/js/battle/runner.js imports them dynamically too).
 const { createBattleFromSpec } = await import('/sim/spec.js');
 const { DataSource, setSimData } = await import('/sim/simdata.js');
-const { RehearsalRun, rehearsalLimits } = await import('/sim/rehearsal.js');
+const { RehearsalRun } = await import('/sim/rehearsal.js');
 
 /** The page's simulation data as a DataSource (null before the data frame arrives). */
 let ds = null;
 
 /**
  * Run one task and return the winning candidate index.
- * @param {{ taskId: string, playerId: string, cap: number, specs: object[], stage?: unknown, tickBudget?: unknown }} task
+ * @param {{ taskId: string, playerId: string, cap: number, limits?: { stage: number, tickBudget: number }, specs: object[] }} task
  */
 function rehearse(task) {
   if (!ds) throw new Error('simulation data not loaded');
@@ -36,10 +36,10 @@ function rehearse(task) {
   // is the server's rehearsal, never this one.
   if ((task.specs || []).some((s) => s && typeof s.cs === 'string' && s.cs !== '')) throw new Error('content set is not rehearsed here');
   // a candidate is built when the run reaches it (server/sim/rehearsal.js): a spec that does not build is skipped
-  const run = new RehearsalRun(task.specs.map((spec) => () => createBattleFromSpec(spec, ds, { quiet: true, recordEvents: false })), task.playerId, task.cap,
-    rehearsalLimits(task));
+  const run = new RehearsalRun(task.specs.map((spec) => () => createBattleFromSpec(spec, ds, { quiet: true, recordEvents: false })), task.playerId, task.cap, task.limits || {});
   run.run();
-  return run.score.index;
+  return { choice: run.score.index, stats: { totalTicks: run.totalTicks, completed: run.completed,
+    considered: run.index, stopReason: run.stopReason } };
 }
 
 self.onmessage = (ev) => {
@@ -52,7 +52,7 @@ self.onmessage = (ev) => {
   }
   if (msg.t !== 'rehearsal') return;
   try {
-    self.postMessage({ t: 'done', taskId: msg.taskId, choice: rehearse(msg) });
+    self.postMessage({ t: 'done', taskId: msg.taskId, ...rehearse(msg) });
   } catch (e) {
     self.postMessage({ t: 'error', taskId: msg.taskId, message: String((e && e.message) || e) });
   }

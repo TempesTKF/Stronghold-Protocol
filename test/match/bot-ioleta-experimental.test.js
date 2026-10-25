@@ -2,14 +2,14 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { computeBonds } from '../../server/match/bondsMeta.js';
 import { SharedPool } from '../../server/match/pool.js';
-import { arrange } from '../../server/match/bot.js';
+import { arrange } from '../../server/match/botOwner.js';
 import {
   EXPERIMENTAL_ELITE_VALUE, EXPERIMENTAL_OPS as O, EXPERIMENTAL_PARAMS,
   experimentalEnabled, experimentalPlan, refreshExperimentalPlan, experimentalTarget, experimentalBondDisabled,
   experimentalCore, experimentalBuyBonus, experimentalBondScore, experimentalCanLevel,
   experimentalSearchTargets,
 } from '../../server/match/botIoletaExperimental.js';
-import { makeMatch, give, legalTileFor, checkInvariants } from './harness.js';
+import { makeOwnerMatch as makeMatch, give, legalTileFor, checkInvariants } from './harness.js';
 
 const L1 = [O.hibiscus, O.podenco, O.jump, O.matterhorn, O.gummy];
 const PRIMARY = [O.hibiscus, O.podenco, O.perfumer, O.jump, O.executor, O.matterhorn, O.gummy, O.bough];

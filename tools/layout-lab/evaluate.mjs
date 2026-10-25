@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { getData } from '../../server/data.js';
 import { buildDeployMap } from '../../server/match/board.js';
-import { planLayout, rangeTiles, fieldModel } from '../../server/match/bot.js';
+import { planLayout, rangeTiles, fieldModel } from '../../server/match/botOwner.js';
 import { createRng } from '../../server/sim/rng.js';
 
 export const demonstrations = JSON.parse(readFileSync(new URL('../../docs/research/layout-demonstrations.json', import.meta.url), 'utf8'));

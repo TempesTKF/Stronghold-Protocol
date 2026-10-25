@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { arrange } from '../../server/match/bot.js';
+import { arrange } from '../../server/match/botOwner.js';
 import { resolveFormationMode } from '../../server/match/botFormation.js';
 import { experimentalEnabled } from '../../server/match/botIoletaExperimental.js';
 import { createRng } from '../../server/sim/rng.js';
-import { makeMatch, give } from './harness.js';
+import { makeOwnerMatch as makeMatch, give } from './harness.js';
 
 const ids = ['chess_char_1_02_a', 'chess_char_1_10_a', 'chess_char_2_08_a', 'chess_char_3_16_a'];
 const signature = plan => [...plan].map(([uid, key]) => [uid, key, plan.dirOf(uid)]).sort();

@@ -13,11 +13,14 @@ export class Matchmaking {
     this.draining = false;
   }
 
-  start(session, difficulty) {
+  start(session, difficulty, version = this.lobby.defaultVersion()) {
+    if (!this.lobby.versionEnabled(version)) return { error: ERR.VERSION_UNKNOWN };
+    if (!this.lobby.versionAvailable(version) || !this.lobby.offered(version, 'coop').length) return { error: ERR.VERSION_UNSUPPORTED };
+    difficulty = this.lobby.fallbackDifficulty(version, 'coop', difficulty);
     if (this.lobby.roomOf(session)) return { error: ERR.ALREADY };
     const existing = this.queue.get(session.playerId);
     if (existing) { this.send(existing); return { ok: true }; } // repeated requests never extend the deadline
-    const search = { session, difficulty, deadlineAt: this.lobby.now() + MATCH_WAIT_MS };
+    const search = { session, difficulty, version, deadlineAt: this.lobby.now() + MATCH_WAIT_MS };
     this.queue.set(session.playerId, search);
     this.send(search);
     this.drain();
@@ -36,10 +39,10 @@ export class Matchmaking {
     return { ok: true };
   }
 
-  findRoom(difficulty) {
+  findRoom(difficulty, version = this.lobby.defaultVersion()) {
     for (const room of this.lobby.rooms.values()) {
       if (!room.disposed && room.isPublic && room.mode === 'coop' && !room.match &&
-          room.difficulty === difficulty && room.freeSeat() >= 0 && room.hasOnlineHumans()) return room;
+          room.version === version && room.difficulty === difficulty && room.freeSeat() >= 0 && room.hasOnlineHumans()) return room;
     }
     return null;
   }
@@ -51,17 +54,17 @@ export class Matchmaking {
     this.timer = null;
     try {
       for (const search of this.queue.values()) {
-        const { session, difficulty, deadlineAt } = search;
+        const { session, difficulty, version, deadlineAt } = search;
         if (!session.connected || this.lobby.registry.byId(session.playerId) !== session || this.lobby.roomOf(session)) {
           this.cancel(session, 'cancelled');
           continue;
         }
-        const room = this.findRoom(difficulty);
+        const room = this.findRoom(difficulty, version);
         if (!room && this.lobby.now() < deadlineAt) continue;
         // The room is rechecked and the seat filled synchronously; parallel requests cannot reserve the same slot.
         this.queue.delete(session.playerId);
         const result = room ? this.lobby.join(session, { code: room.code })
-          : this.lobby.create(session, { mode: 'coop', difficulty });
+          : this.lobby.create(session, { mode: 'coop', difficulty, version });
         sendSession(session, { t: 'match.state', searching: false,
           reason: result.ok ? room ? 'joined' : 'created' : 'failed', ...(result.error ? { error: result.error } : {}) });
       }

@@ -306,7 +306,7 @@ describe('皮肤: the lobby seat and the match', () => {
       for (const ent of readdirSync(dir, { withFileTypes: true })) {
         const p = path.join(dir, ent.name);
         if (ent.isDirectory()) walk(p);
-        else if (ent.name.endsWith('.js') && readFileSync(p, 'utf8').includes('.skin')) hits.push(path.relative(ROOT, p));
+        else if (ent.name.endsWith('.js') && readFileSync(p, 'utf8').includes('.skin')) hits.push(path.relative(ROOT, p).split(path.sep).join('/'));
       }
     };
     walk(root);
@@ -427,7 +427,7 @@ describe('皮肤: the client never sends more than the wire accepts', () => {
       status: 'online', sent: [], on: () => () => {},
       request: async (t, body) => { net.sent.push({ t, ...body }); return { t: 'ok' }; },
     };
-    const sync = installSkinsSync({ net, target });
+    const sync = installSkinsSync({ net, target, operatorsReady: async () => new Set(Object.keys(overLimit())) });
     try {
       await sync.flush();
     } finally { sync.dispose(); }

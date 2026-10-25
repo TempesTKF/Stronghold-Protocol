@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { createRng } from '../../server/sim/rng.js';
 import { createRegistry } from '../../server/match/effectsMeta.js';
 import { botRefinement } from '../../server/match/botRefinements.js';
-import { createRehearsalSteps, runSteps, repairLayout, supportedContact, LayoutPlan } from '../../server/match/bot.js';
-import { makeMatch, give, checkInvariants } from './harness.js';
+import { createRehearsalSteps, runSteps, repairLayout, supportedContact, LayoutPlan } from '../../server/match/botOwner.js';
+import { makeOwnerMatch as makeMatch, give, checkInvariants } from './harness.js';
 
 test('cloning a random stream preserves all subsequent draws, including state zero', () => {
   const r = createRng((-0x6d2b79f5) >>> 0);

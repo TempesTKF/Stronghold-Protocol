@@ -10,8 +10,9 @@ import assert from 'node:assert/strict';
 import { PHASE } from '../../shared/constants.js';
 import { validateC2S } from '../../shared/protocol.js';
 import { deriveSeed } from '../../server/sim/rng.js';
-import { RehearsalRun, rehearsalLimits } from '../../server/sim/rehearsal.js';
-import { ADAPTIVE_STAGE, ADAPTIVE_CAPS } from '../../server/match/bot.js';
+import { RehearsalRun } from '../../server/sim/rehearsal.js';
+import { rehearsalLimits } from '../../server/sim/ownerRehearsal.js';
+import { ADAPTIVE_STAGE, ADAPTIVE_CAPS } from '../../server/match/botOwner.js';
 import { makeMatch, checkInvariants } from './harness.js';
 import { attachRehearsalHost, simulateRehearsal } from './simClient.js';
 
@@ -447,7 +448,7 @@ test('protocol rejects a forged, out-of-range or non-boolean rehearsal answer', 
 test('an adaptive rehearsal sends its limits; the browser stops where the server does and the match is the same', () => {
   /** The co-op match with the adaptive formation mode on a taught map. */
   const adaptive = (o) => {
-    const h = coopMatch(o).setStage('act2autochess_m03');
+    const h = coopMatch({ botStrategy: 'owner', ...o }).setStage('act2autochess_m03');
     h.m.botFormationEnabled = true;
     h.m.botFormationMode = 'adaptive';
     return h;
@@ -467,10 +468,10 @@ test('an adaptive rehearsal sends its limits; the browser stops where the server
     if (msg.t !== 'b.rehearsal') return;
     const job = h.m._rehearsalTasks.get(msg.taskId)?.job;
     frames.push(msg);
-    assert.equal(msg.stage, ADAPTIVE_STAGE);
-    assert.equal(msg.tickBudget, ADAPTIVE_CAPS * msg.cap);
+    assert.equal(msg.limits.stage, ADAPTIVE_STAGE);
+    assert.equal(msg.limits.tickBudget, ADAPTIVE_CAPS * msg.cap);
     const serverPick = (() => {
-      const run = new RehearsalRun(job.inputs.map((o) => () => h.m.newBattle(o)), msg.playerId, msg.cap, rehearsalLimits(msg));
+      const run = new RehearsalRun(job.inputs.map((o) => () => h.m.newBattle(o)), msg.playerId, msg.cap, rehearsalLimits(msg.limits));
       run.run();
       return run.score.index;
     })();

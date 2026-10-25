@@ -1,3 +1,4 @@
+import { t } from '../../shared/i18n.js';
 // Persistent owner-managed announcements and bans. Never served as a static file.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -43,19 +44,19 @@ export function createAdminStore(file) {
     saveDraft(value, revision) {
       if (revision !== state.revision) throw adminError(409, '内容已被其他操作更新，请刷新后重试');
       const draft = announcementInput(value);
-      change('保存公告草稿', s => { s.draft = draft; });
+      change(t('保存公告草稿'), s => { s.draft = draft; });
     },
     publish(revision) {
       if (revision !== state.revision) throw adminError(409, '内容已更新，请刷新后重试');
       if (!state.draft.title || !state.draft.body) throw adminError(400, '请先保存完整的公告标题和正文');
-      change('发布公告', s => { s.published = { ...s.draft, id: randomUUID(), publishedAt: Date.now() }; });
+      change(t('发布公告'), s => { s.published = { ...s.draft, id: randomUUID(), publishedAt: Date.now() }; });
     },
-    unpublish() { change('撤下公告', s => { s.published = null; }); },
+    unpublish() { change(t('撤下公告'), s => { s.published = null; }); },
     ban(session, reason, withIp) {
       if (state.bans.length >= 5000) throw adminError(409, '封禁记录已达上限');
       if (withIp && (!session.addr || session.addr === '?')) throw adminError(400, '此玩家的 IP 不可用');
       const hash = tokenHash(session.token);
-      change(`封禁玩家 ${session.playerId}`, s => {
+      change(t('封禁玩家 {playerId}', { playerId: session.playerId }), s => {
         s.bans = s.bans.filter(b => b.tokenHash !== hash);
         s.bans.push({ id: randomUUID(), playerId: session.playerId, name: session.name,
           tokenHash: hash, ip: withIp ? session.addr : null, reason, createdAt: Date.now() });
@@ -63,7 +64,7 @@ export function createAdminStore(file) {
     },
     unban(id) {
       if (!state.bans.some(b => b.id === id)) throw adminError(404, '封禁记录不存在');
-      change(`解除封禁 ${id}`, s => { s.bans = s.bans.filter(b => b.id !== id); });
+      change(t('解除封禁 {id}', { id: id }), s => { s.bans = s.bans.filter(b => b.id !== id); });
     },
     record: (action) => change(action, () => {}),
   };

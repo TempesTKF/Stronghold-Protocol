@@ -2,12 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { formationProfile, formationRole, formationValue, contactValue, resolveFormationMode } from '../../server/match/botFormation.js';
 import { FORMATION_PROFILES } from '../../server/match/botFormationProfiles.js';
-import { planLayout, arrange, ADAPTIVE_STAGE, ADAPTIVE_CAPS } from '../../server/match/bot.js';
-import { rehearsalCap } from '../../server/sim/rehearsal.js';
+import { planLayout, arrange, ADAPTIVE_STAGE, ADAPTIVE_CAPS } from '../../server/match/botOwner.js';
+import { rehearsalCap } from '../../server/sim/ownerRehearsal.js';
 import { createRng } from '../../server/sim/rng.js';
 import { canPlace, placeClass } from '../../server/match/board.js';
 import { demonstrations, exampleSetup, evaluateExample } from '../../tools/layout-lab/evaluate.mjs';
-import { makeMatch, give } from './harness.js';
+import { makeOwnerMatch as makeMatch, give } from './harness.js';
 
 test('compiled map profiles include exactly five eight-person demonstrations per map', () => {
   assert.equal(demonstrations.examples.length, 42);

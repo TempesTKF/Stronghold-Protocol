@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { arrange, botPrepBegin, levelUp } from '../../server/match/bot.js';
-import { eliteCount, ioletaBondScore, ioletaBuyBondBonus } from '../../server/match/botIoleta.js';
-import { makeMatch, give, checkInvariants } from './harness.js';
+import { arrange, botPrepBegin, levelUp } from '../../server/match/botOwner.js';
+import { eliteCount, ioletaBondScore, ioletaBuyBondBonus } from '../../server/match/botIoletaOwner.js';
+import { makeOwnerMatch as makeMatch, give, checkInvariants } from './harness.js';
 
 const STEAD = ['chess_char_1_02_a', 'chess_char_1_10_a', 'chess_char_2_08_a'];
 const PRECI = ['chess_char_1_09_a', 'chess_char_1_17_a', 'chess_char_2_01_a'];

@@ -1,8 +1,8 @@
 // Regression cases ported from sganggs/Stronghold-Protocol c24e17ee (#577/#315).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { arrange, botPrepBegin } from '../../server/match/bot.js';
-import { makeMatch, give, giveItem, legalTileFor, checkInvariants } from './harness.js';
+import { arrange, botPrepBegin } from '../../server/match/botOwner.js';
+import { makeOwnerMatch as makeMatch, give, giveItem, legalTileFor, checkInvariants } from './harness.js';
 test('user: Given a bond that counts the hand, When replacing a deployed member, Then count it only when there is room to withdraw it', () => {
   for (const [deployed, crowded] of [[false, false], [true, false], [true, true]]) {
     const { m } = makeMatch({ mode: 'coop', humans: 2, seed: 11 }).start().toPrep();

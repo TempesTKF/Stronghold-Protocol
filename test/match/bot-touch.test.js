@@ -6,9 +6,9 @@ import { SharedPool } from '../../server/match/pool.js';
 import { TOUCH_OPS as O, TOUCH_PARAMS, refreshTouchPlan, touchTarget, touchCore, touchBuyBonus, touchCanLevel,
   touchEnabled, touchItemBonus, touchItemPlan, touchLineupBonus, touchHealKeys, touchTile, touchTinmanMove } from '../../server/match/botTouchPolicy.js';
 import { placeTinmanInTouchRange } from '../../server/match/botTouch.js';
-import { botPickCard } from '../../server/match/bot.js';
+import { botPickCard } from '../../server/match/botOwner.js';
 import { canPlace, parseKey, placeClass } from '../../server/match/board.js';
-import { makeMatch, give, giveItem, legalTileFor, checkInvariants } from './harness.js';
+import { makeOwnerMatch as makeMatch, give, giveItem, legalTileFor, checkInvariants } from './harness.js';
 
 const SOLVENT = 'chess_item_1_05_e_a'; // 源石溶剂
 const DAGGER = 'chess_item_3_04_e_a'; // 炎国短刀
