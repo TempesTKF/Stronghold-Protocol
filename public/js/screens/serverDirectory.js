@@ -10,7 +10,7 @@ import { t } from '../../../shared/i18n.js';
 
 const REFRESH_MS = 3000;
 
-function useDirectory(online) {
+export function useDirectory(online) {
   const [state, setState] = useState({ snapshot: null, refreshing: true, error: false });
   const refresh = useRef(() => {});
   useEffect(() => {

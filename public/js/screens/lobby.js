@@ -55,7 +55,8 @@ import { Emblem } from './title.js';
 import { SettingsButton } from '../ui/settings.js';
 import { PwaInstallButton, detectFeatures, useMediaQuery, SHORT_SCREEN_QUERY } from '../ui/device.js';
 import { LoadoutButton } from './loadout.js';
-import { ServerDirectory } from './serverDirectory.js';
+import { ServerAnnouncement } from '../ui/serverAnnouncement.js';
+import { ServerDirectory, useDirectory } from './serverDirectory.js';
 import { net, identity } from '../net.js';
 import { store, useStore, shallowEqual, loadPref, savePref } from '../store.js';
 import { data, getConfig, getMode, getStage, useData } from '../data.js';
@@ -431,11 +432,18 @@ function AchievementPlate({ onOpen }) {
 }
 
 /** A tile of the hub's left column (密钥加入). */
-function HubTile({ icon, label, en, onClick, class: cls = '' }) {
+function HubTile({ icon, label, en, onClick, badge = null, class: cls = '' }) {
   return html`<button type="button" class=${`hub-tile ${cls}`} onClick=${onClick}>
     <span class="hub-tile__icon" aria-hidden="true"><${Icon} name=${icon} /></span>
-    <span class="hub-tile__text"><span class="hub-tile__label">${label}</span><span class="hub-tile__en">${en}</span></span>
+    <span class="hub-tile__text"><span class="hub-tile__label">${label}</span><span class="hub-tile__en">${en}</span></span>${badge}
   </button>`;
+}
+
+function ServerHubTile({ onClick }) {
+  const online = useStore(s => s.connection.status === 'online');
+  const { snapshot, error } = useDirectory(online);
+  return html`<${HubTile} icon="users" label=${t('服务器大厅')} en="SERVER LOBBY" onClick=${onClick}
+    badge=${html`<span class="hub-online" aria-live="polite"><span>${t('在线人数')}</span><b class="num">${error ? '—' : snapshot?.onlinePlayers ?? '—'}</b></span>`} />`;
 }
 
 /** Crossed blades in a hexagon: the S.W.E.E.P. plate's glyph (original drawing). */
@@ -599,7 +607,7 @@ export function ProtocolSelect({ roomMode, difficulty, onDifficulty, onClose, on
  * `placeholderShort`, by the field's width: English and Japanese at 特大 on every desktop, the default Chinese at 特大
  * in a 1024 px window — it ended in an ellipsis there).
  */
-export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, onCode, codeOk, online, busy, onJoin, onSpectate, recent, marks, focusKey,
+export function AllianceSelect({ onClose, onCreate, difficulty = 'ABYSS', code, onCode, codeOk, online, busy, onJoin, onSpectate, recent, marks, focusKey,
   testMode = false, asTest = false, onTest = () => {}, short = false }) {
   const diffName = DIFFICULTY_NAMES[difficulty] ? t(DIFFICULTY_NAMES[difficulty]) : '';
   return html`<${Modal} open=${true} onClose=${onClose} class="ally" veilClass="proto-veil">
@@ -645,7 +653,7 @@ export function AllianceSelect({ onClose, onCreate, difficulty = 'FUNNY', code, 
                   onClick=${() => onCode(c)}>${c}${Array.isArray(marks) && marks.includes(c) ? html` <${TestMark} />` : null}</button>`)}`
                 : html`<span class="t-dim">${t('向同伴索取 {ROOM_CODE_LEN} 位同盟密钥，或直接打开邀请链接', { ROOM_CODE_LEN })}</span>`}
             </span>
-            <button type="button" class="ally-card__bar ally-card__bar--join" disabled=${!codeOk || !online || busy === 'join'} onClick=${() => onJoin()}>
+            <button type="button" class="ally-card__bar ally-card__bar--join" disabled=${(!!code.trim() && !codeOk) || !online || busy === 'join'} onClick=${() => onJoin()}>
               <span class="ally-card__icon"><${Icon} name="users" /></span>${t('加入同盟')}${busy === 'join' ? html`<${Spinner} size="sm" />` : null}
             </button>
           </div>
@@ -699,7 +707,7 @@ export function LobbyScreen() {
   const solo = offeredDifficulties(versionLoading ? null : cfg, 'solo');
   const coop = offeredDifficulties(versionLoading ? null : cfg, 'coop');
   const shownSolo = fallbackDifficulty(solo, difficulty);
-  const shownCoop = fallbackDifficulty(coop, difficulty);
+  const shownCoop = fallbackDifficulty(coop, 'ABYSS');
 
   const openMode = (m) => { if (m === 'solo') setSoloOpen(true); else setAllyOpen(true); };
   const pickDifficulty = (d) => { setDifficulty(d); savePref('lobby.difficulty', d); };
@@ -715,7 +723,7 @@ export function LobbyScreen() {
       if (alive.current) setBusy(null);
     }
   };
-  // 独立模拟: at the difficulty picked on 选择模拟协议; 创建同盟: at the remembered one, changed in the room by the host
+  // 独立模拟: at the difficulty picked on 选择模拟协议; 创建同盟: defaults to 终极 (or the highest difficulty this version offers), changed in the room by the host
   // (`version`: the lobby's, only when welcome.versions is present — protocol §4; omitted when the server offers 第二期下半 alone)
   const create = (mode) => run('create', () => net.request('room.create', {
     mode, difficulty: mode === 'solo' ? shownSolo : shownCoop, ...(testMode && asTest ? { test: true } : {}), ...(versions ? { version } : {}),
@@ -724,6 +732,7 @@ export function LobbyScreen() {
   const join = (c = code) => {
     // `onClick=${join}` hands the click EVENT as the first argument, and a default parameter only applies to
     // `undefined` — codeArg keeps an event target out of the key and falls back to the input field
+    if (!code.trim() && (typeof c !== 'string' || !c.trim())) { setAllyOpen(false); setDirectoryOpen('match'); return; }
     const k = codeArg(c, code);
     if (!k) { toast(t('同盟密钥为 {ROOM_CODE_LEN} 位字母或数字', { ROOM_CODE_LEN }), 'warn'); return; }
     run('join', () => joinKnown('room.join', k));
@@ -778,7 +787,8 @@ export function LobbyScreen() {
     <main class="hub-stage">
       <${HubTitle} />
       <aside class="hub-side">
-        <${HubTile} icon="users" label=${t('服务器大厅')} en="SERVER LOBBY" onClick=${() => setDirectoryOpen(true)} />
+        <${ServerHubTile} onClick=${() => setDirectoryOpen(true)} />
+        <${ServerAnnouncement} />
         <${AchievementCard} onOpen=${() => setAchOpen(true)} />
         <${HubTile} icon="key" label=${t('密钥加入')} en="JOIN WITH KEY" class="hub-tile--key" onClick=${() => setAllyOpen(true)} />
         <${TipsPanel} />

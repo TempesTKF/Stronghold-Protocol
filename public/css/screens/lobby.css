@@ -1190,3 +1190,11 @@ button.ally-card:disabled .ally-card__bar { filter: grayscale(.5) brightness(.8)
 .proto-list__wait { display: flex; align-items: center; gap: .08rem; margin: 0; color: var(--text-lo); font-size: calc(.15 * var(--t)); }
 .proto-list__wait.is-failed { flex-wrap: wrap; color: var(--amber); }
 .proto-list__wait.is-failed .icon { flex: none; width: 1.1em; height: 1.1em; }
+
+/* Compact live population and published notice beneath the server entry. */
+.hub-online { margin-left: auto; display: flex; align-items: center; gap: .08rem; color: var(--mint-400); white-space: nowrap; font-size: calc(.13 * var(--t)); }
+.hub-online b { font-size: calc(.22 * var(--t)); }
+.hub-side > .server-announcement { width: 100%; box-sizing: border-box; padding: .12rem .16rem; }
+.hub-side > .server-announcement p { max-height: 1.2rem; }
+.hub-side > .server-announcement .server-announcement__head { flex-wrap: wrap; }
+.matchmaking-screen .diff-card:disabled { cursor: default; }

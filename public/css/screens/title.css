@@ -341,3 +341,19 @@ html[data-script="alphabetic"] .title-login .btn--xl { letter-spacing: .3em; }
 .notice-card__meta { margin: 0; font-size: calc(.13 * var(--t)); color: var(--text-dim); overflow-wrap: anywhere; }
 .notice-card__title { margin: .02rem 0; font-size: calc(.16 * var(--t)); color: var(--text-hi); overflow-wrap: anywhere; }
 .notice-card__body { margin: 0; font-size: calc(.15 * var(--t)); color: var(--text-md); line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+
+/* Keep utility buttons together; legal/version text uses a separate, aligned row. */
+.title-foot { display: flex; flex-direction: column; align-items: stretch; gap: .14rem; }
+.title-foot__actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .1rem; }
+.title-foot__info { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .1rem .24rem; }
+.title-foot__copyright { line-height: 1.5; }
+.title-conn { flex-wrap: nowrap; gap: .06rem; min-width: 0; }
+.title-conn__status { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; }
+.title-conn .status-dot, .title-conn .ping, .title-conn .fsbtn { flex-shrink: 0; }
+.title-conn .title-guide { flex: 0 1 auto; min-width: 0; white-space: nowrap; }
+.title-conn .title-guide .btn__label { overflow: hidden; text-overflow: ellipsis; }
+.title-conn .title-settings, .title-conn .title-fs { margin-left: 0; }
+@media (max-width: 767px) {
+  .title-foot__info { justify-content: center; text-align: center; }
+  .title-foot__meta { justify-content: center; }
+}

@@ -257,7 +257,7 @@ export function TitleScreen() {
         <${Button} variant="primary" size="xl" block=${true} iconRight="chevrons" disabled=${!valid} onClick=${start}>${t('开始')}<//>
         <div class="title-conn">
           <span class=${`status-dot ${dotClass}`}></span>
-          <span>${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}</span>
+          <span class="title-conn__status" title=${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}>${STATUS_TEXT[conn.status] ? t(STATUS_TEXT[conn.status]) : conn.status}</span>
           ${conn.status === 'online' ? html`<${PingPill} ms=${conn.ping} />` : null}
           <${GuideButton} class="title-guide" label=${t('玩法说明')} />
           <button type="button" class="title-settings fsbtn tapx" aria-label=${t('设置')} title=${t('设置')}
@@ -275,17 +275,21 @@ export function TitleScreen() {
 
     <${ServerAnnouncement} />
     <footer class="title-foot">
+      <div class="title-foot__actions">
       <${ResumeMatchButton} />
       <${PwaInstallButton} />
       <${NoticesButton} />
       ${installed ? html`<button type="button" class="title-plugins" data-testid="title-plugins" onClick=${openPlugins}>
         <${Icon} name="info" />${t('本服务器安装了 {n} 个插件', { n: installed })}</button>` : null}
-      <span>${t('非官方同人复刻 · 游戏素材版权归 上海鹰角网络 / Yostar 所有')}</span>
+      </div>
+      <div class="title-foot__info">
+      <span class="title-foot__copyright">${t('非官方同人复刻 · 游戏素材版权归 上海鹰角网络 / Yostar 所有')}</span>
       <span class="title-foot__meta">
         <a class="title-repo" href="https://github.com/sganggs/Stronghold-Protocol" target="_blank" rel="noopener noreferrer">${t('项目仓库')}</a>
         <${MicroLabel}>v${APP_VERSION} · WEB SIMULATION<//>
         ${DEV_BUILD ? html`<span class="title-dev" role="note">${t('开发版 · 不稳定，请勿用于公开服务器')}</span>` : null}
       </span>
+      </div>
     </footer>
   </div>`;
 }
