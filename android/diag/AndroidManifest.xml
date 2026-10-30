@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  卫戍协议诊断（android/diag）：排查离线版「本机服务器启动失败」的独立小工具，与游戏是两个包。
+  只读离线版的安装包与原生库目录（任何应用都能读），在自己的缓存目录里另起一份服务端试跑；
+  不碰离线版的数据、设置与正在运行的进程。INTERNET 只用于本机 127.0.0.1 的端口检查与试跑。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.stronghold.diag">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Android 11+ 的包可见性：不声明就查不到离线版与联机版 -->
+    <queries>
+        <package android:name="app.stronghold.shell.offline" />
+        <package android:name="app.stronghold.shell" />
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:label="卫戍协议诊断"
+        android:theme="@android:style/Theme.Material">
+
+        <activity
+            android:name="app.stronghold.diag.DiagActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

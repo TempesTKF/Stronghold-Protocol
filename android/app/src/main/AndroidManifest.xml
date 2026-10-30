@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  卫戍协议 Android 外壳：把上游（sganggs/Stronghold-Protocol）的浏览器客户端装进 WebView。
+  上游代码不作任何修改；本外壳只负责「加载哪个 origin」，因此天然兼容上游的版本检查
+  （net.js 回连页面所在 host 的 /ws，hello 携带 PROTOCOL_VERSION）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="app.stronghold.shell">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 离线版的本机服务器跑在前台服务里（LocalServerService），切后台不被冻结，回来能重连同一局 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+    <uses-feature android:name="android.software.webview" android:required="true" />
+
+    <application
+        android:allowBackup="false"
+        android:extractNativeLibs="true"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="false"
+        android:usesCleartextTraffic="true"
+        android:theme="@style/ShellTheme">
+
+        <activity
+            android:name="app.stronghold.shell.MainActivity"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden|density|uiMode|navigation"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:screenOrientation="sensorLandscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- OFFLINE_ZIP_FILTER：MODE=offline 时 build.sh 把这一行换成 zip 的打开方式（导入素材包 / 皮肤包）；联机版没有导入，不出现在「打开方式」里 -->
+        </activity>
+
+        <service
+            android:name="app.stronghold.shell.LocalServerService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Local game server (Node.js) for offline play; keeps the match resumable while the app is in the background" />
+        </service>
+    </application>
+</manifest>
