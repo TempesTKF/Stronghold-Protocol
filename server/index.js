@@ -206,7 +206,7 @@ export async function startServer(opts = {}) {
   try {
     const ownerOptions = adminOptions(ROOT, opts.admin);
     if (ownerOptions) {
-      admin = createAdmin({ options: ownerOptions, root: ROOT, registry, lobby, network, startedAt, log });
+      admin = createAdmin({ options: ownerOptions, root: ROOT, registry, lobby, network, startedAt, log, gameServer: server });
       network.blocked = admin.blocked;
     }
     // A host with IPv6 switched off refuses '::'. Fall back to IPv4 rather than not booting. Only the default is

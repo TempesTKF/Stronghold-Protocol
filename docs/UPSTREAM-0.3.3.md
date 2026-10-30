@@ -6,6 +6,13 @@ HTTP ZIP imports and installed cosmetic skins. Bulk asset predownload stays disa
 The directory is reachable from the new upstream lobby; matchmaking uses the selected official version
 and cannot join another version merely because the difficulty matches.
 
+The owner console keeps 48 hours of local game-service health observations in
+`service-history.jsonl` alongside its configured `state.json`. It probes the game listener's
+`/healthz` once per minute without requiring the console to be open. The timeline marks missing
+samples as unknown; it cannot determine public-network reachability or monitor while the process is
+stopped. The first 48 hours begin accumulating after this feature starts. Preserve this file with the
+admin state when upgrading or migrating the server.
+
 ## AI and engine boundaries
 
 The production entry and local admin launcher default `SP_BOT_STRATEGY` to `owner`.

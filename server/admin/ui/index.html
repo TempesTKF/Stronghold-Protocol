@@ -10,6 +10,18 @@
 <p>使用服务器管理员密码进入控制台。</p>
 <form id="login"><label>管理员密码<input id="password" type="password" autocomplete="current-password" required maxlength="256"></label><button class="primary" type="submit">登录后台</button></form></section>
 <div id="dashboard" hidden>
+<section class="card service-history" aria-labelledby="history-title">
+  <div class="section-head"><div><span class="eyebrow">SERVICE HISTORY</span><h2 id="history-title">最近 48 小时服务状态</h2></div><span id="history-current" class="badge">检查中</span></div>
+  <p class="muted history-description">每分钟检查本机游戏服务，每格代表 1 小时；缺少记录的时段不会判定为故障。</p>
+  <p id="history-storage" class="history-warning" role="status" hidden>状态记录无法保存，重启后可能丢失。</p>
+  <div class="history-scroll" id="history-scroll"><div class="history-track">
+    <div id="history-bars" class="history-bars" role="group" aria-label="最近 48 小时逐小时服务状态"></div>
+    <div class="history-axis" aria-hidden="true"><span>48 小时前</span><span>24 小时前</span><span>现在</span></div>
+  </div></div>
+  <div class="history-legend"><span class="history-legend--healthy">正常</span><span class="history-legend--partial">部分采集</span><span class="history-legend--failed">检查失败</span><span class="history-legend--unknown">无记录</span></div>
+  <p id="history-detail" class="history-detail" aria-live="polite">选择或悬停色块查看该时段详情。</p>
+  <p class="history-note">检查服务所在机器的游戏接口，不代表公网网络一定可达。服务停止或监测中断期间显示为无记录。</p>
+</section>
 <section class="metrics" id="metrics" aria-label="服务器负载"></section>
 <nav aria-label="管理功能"><button data-tab="players" class="active">在线玩家</button><button data-tab="rooms">房间管理</button><button data-tab="announcement">服务器公告</button><button data-tab="bans">封禁名单</button><button data-tab="audit">操作记录</button><button id="refresh">立即刷新</button></nav>
 <section id="players" class="card tab"><div class="section-head"><h2>玩家会话</h2><span id="player-count"></span></div><p class="muted">显示在线玩家与保留房间中的离线玩家。踢出允许重新连接；封禁阻止原身份重新进入。</p><div class="table-scroll"><table><thead><tr><th>玩家</th><th>状态</th><th>房间</th><th>IP 地址</th><th>最近活动</th><th>操作</th></tr></thead><tbody id="player-rows"></tbody></table></div></section>

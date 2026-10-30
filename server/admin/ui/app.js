@@ -52,8 +52,53 @@ function metric(title, value, detail) {
   card.append(node('span', title), node('b', value), node('small', detail));
   return card;
 }
+const historyLabel = { healthy: '正常', partial: '部分采集', failed: '检查失败', unknown: '无记录' };
+const historyTime = value => new Date(value).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false });
+let shownHistory = null, historyIndex = null;
+function historyDetail(index) {
+  const b = shownHistory?.buckets[index];
+  if (!b) return;
+  $('history-detail').textContent = `${historyTime(b.from)} – ${historyTime(b.to)} · ${historyLabel[b.status]} · 正常 ${b.healthy} 次，失败 ${b.failed} 次，未采样 ${b.missing} 分钟`;
+}
+function renderHistory(history, now) {
+  if (!history || !Array.isArray(history.buckets)) return;
+  shownHistory = history;
+  const current = history.lastCheck;
+  const stale = !current || now - current.at > 120_000;
+  $('history-current').textContent = stale ? '等待检查' : current.ok ? '当前正常' : '检查失败';
+  $('history-current').classList.toggle('offline', stale || !current.ok);
+  $('history-storage').hidden = history.storageOk;
+  const bars = $('history-bars');
+  if (bars.children.length !== history.buckets.length) {
+    bars.replaceChildren(...history.buckets.map((_, index) => {
+      const bar = node('button', null, 'history-bar');
+      bar.type = 'button'; bar.tabIndex = index === history.buckets.length - 1 ? 0 : -1;
+      const show = () => { historyIndex = index; historyDetail(index); };
+      bar.addEventListener('mouseenter', show); bar.addEventListener('focus', show); bar.addEventListener('click', show);
+      bar.addEventListener('keydown', event => {
+        let next;
+        if (event.key === 'ArrowLeft') next = Math.max(0, index - 1);
+        else if (event.key === 'ArrowRight') next = Math.min(bars.children.length - 1, index + 1);
+        else if (event.key === 'Home') next = 0;
+        else if (event.key === 'End') next = bars.children.length - 1;
+        else return;
+        event.preventDefault(); bar.tabIndex = -1; bars.children[next].tabIndex = 0; bars.children[next].focus();
+      });
+      return bar;
+    }));
+    $('history-scroll').scrollLeft = $('history-scroll').scrollWidth;
+  }
+  history.buckets.forEach((b, index) => {
+    const bar = bars.children[index];
+    bar.className = `history-bar history-bar--${b.status}`;
+    const label = `${historyTime(b.from)} – ${historyTime(b.to)}：${historyLabel[b.status]}，正常 ${b.healthy} 次，失败 ${b.failed} 次，未采样 ${b.missing} 分钟`;
+    bar.title = label; bar.setAttribute('aria-label', label);
+  });
+  if (historyIndex != null) historyDetail(historyIndex);
+}
 function render(state) {
   current = state;
+  renderHistory(state.serviceHistory, state.now);
   const m = state.metrics, memory = m.memory, disk = m.disk, net = m.network;
   const percent = (a, b) => b ? `${(100 * a / b).toFixed(1)}%` : '采样中';
   $('metrics').replaceChildren(
@@ -150,4 +195,5 @@ $('cancel').addEventListener('click', () => { confirmAction = null; $('confirm-d
 $('confirm-form').addEventListener('submit', async event => { event.preventDefault(); const action = confirmAction; confirmAction = null; $('confirm-dialog').close(); await action?.(); });
 setInterval(() => { if (!document.hidden && !$('confirm-dialog').open) void refresh(); }, 5000);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
+window.addEventListener('resize', () => { $('history-scroll').scrollLeft = $('history-scroll').scrollWidth; });
 if (token) void refresh();

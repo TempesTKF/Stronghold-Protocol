@@ -9,6 +9,7 @@ import { StubMatch } from '../server/match/StubMatch.js';
 import { TestClient } from './helpers/wsClient.js';
 import { createAdminStore } from '../server/admin/store.js';
 import { passwordRecord, createAdminAuth } from '../server/admin/auth.js';
+import { createServiceHistory, probeGameServer } from '../server/admin/history.js';
 
 test('admin HTTP isolation, announcement publication, moderation and durable bans', async t => {
   const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-admin-'));
@@ -37,6 +38,9 @@ test('admin HTTP isolation, announcement publication, moderation and durable ban
   assert.equal((await fetch(srv.url + '/admin/')).status, 404);
   const s0 = (await call('state')).data;
   assert.equal(s0.published, null);
+  assert.equal(s0.serviceHistory.buckets.length, 48);
+  assert.equal(s0.serviceHistory.lastCheck.ok, true, 'the game health check is sampled without a browser');
+  assert.equal(s0.serviceHistory.buckets.at(-1).healthy, 1);
   assert.equal((await call('announcement/draft', { title: '<b>公告</b>', body: '<script>alert(1)</script>\n测试', revision: s0.revision })).status, 200);
   assert.equal((await (await fetch(srv.url + '/api/announcement')).json()).announcement, null, 'draft is private');
   assert.equal((await call('announcement/publish', { revision: s0.revision })).status, 409);
@@ -119,4 +123,71 @@ test('admin bind failure closes the already-bound game listener', async () => {
     await assert.rejects(startServer({ host: '127.0.0.1', port: 0, assetIndex: false, studio: false, quiet: true,
       admin: { port, host: '127.0.0.1', password: await passwordRecord('test') } }), { code: 'EADDRINUSE' });
   } finally { await new Promise(resolve => occupied.close(resolve)); }
+});
+
+test('48-hour history preserves observations across restarts and leaves gaps unknown', async t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-history-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const file = path.join(folder, 'service-history.jsonl');
+  let clock = Date.UTC(2026, 9, 30, 12), healthy = true;
+  const create = () => createServiceHistory({ file, now: () => clock, probe: async () => healthy, sampleMs: 3_600_000 });
+  let history = create();
+  await history.start();
+  let view = history.snapshot();
+  assert.equal(view.buckets.length, 48);
+  assert.equal(view.buckets.filter(b => b.status === 'unknown').length, 47);
+  assert.deepEqual({ status: view.buckets.at(-1).status, healthy: view.buckets.at(-1).healthy, missing: view.buckets.at(-1).missing },
+    { status: 'partial', healthy: 1, missing: 59 });
+  for (let i = 1; i < 60; i++) { clock += 60_000; await history.sample(); }
+  assert.equal(history.snapshot().buckets.at(-1).status, 'healthy', 'a full observed hour is healthy');
+  clock += 60_000; healthy = false; await history.sample();
+  assert.equal(history.snapshot().buckets.at(-1).status, 'failed');
+  healthy = true; await history.sample();
+  assert.equal(history.snapshot().buckets.at(-1).failed, 1, 'a later success cannot erase a failure in the same minute');
+  await history.close();
+  // Simulate a partial final write followed by a period in which no monitoring ran.
+  fs.appendFileSync(file, '{"minute":');
+  clock += 10 * 60_000;
+  history = create();
+  await history.start();
+  view = history.snapshot();
+  assert.equal(view.buckets.at(-1).failed, 1, 'failed observation survives restart');
+  assert.equal(view.buckets.at(-1).missing, 9, 'unmonitored minutes are not labeled failures');
+  await history.close();
+  history = create();
+  await history.start();
+  assert.equal(history.snapshot().buckets.at(-1).failed, 1, 'repairing a partial line keeps prior observations');
+  await history.close();
+  clock += 49 * 60 * 60_000;
+  history = create();
+  await history.start();
+  view = history.snapshot();
+  assert.equal(view.buckets.filter(b => b.status === 'unknown').length, 47);
+  assert.equal(view.buckets.at(-1).healthy, 1);
+  await history.close();
+  assert.ok(fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).length < 3, 'expired history is compacted');
+});
+
+test('local probe checks the health response and reports failed or unavailable listeners', async t => {
+  let reply = { status: 200, body: '{"ok":true}' };
+  const server = http.createServer((_req, res) => { res.writeHead(reply.status); res.end(reply.body); });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { if (server.listening) server.close(); });
+  assert.equal(await probeGameServer(server), true);
+  reply = { status: 503, body: '{"ok":true}' };
+  assert.equal(await probeGameServer(server), false);
+  reply = { status: 200, body: '{broken' };
+  assert.equal(await probeGameServer(server), false);
+  await new Promise(resolve => server.close(resolve));
+  assert.equal(await probeGameServer(server), false);
+});
+
+test('history storage failure is reported without preventing live checks', async t => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), 'sp-history-unwritable-'));
+  t.after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const history = createServiceHistory({ file: folder, probe: async () => true, log: {}, sampleMs: 3_600_000 });
+  await history.start();
+  assert.equal(history.snapshot().storageOk, false);
+  assert.equal(history.snapshot().lastCheck.ok, true);
+  await history.close();
 });

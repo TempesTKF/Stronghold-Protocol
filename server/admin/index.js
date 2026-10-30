@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { createAdminAuth } from './auth.js';
 import { adminError, createAdminStore } from './store.js';
 import { createMetrics } from './metrics.js';
+import { createServiceHistory, probeGameServer } from './history.js';
 import { clientAddress } from '../net.js';
 
 const UI = fileURLToPath(new URL('./ui/', import.meta.url));
@@ -40,10 +41,13 @@ function json(res, status, value) {
   res.end(JSON.stringify(value));
 }
 
-export function createAdmin({ options, root, registry, lobby, network, startedAt, log }) {
+export function createAdmin({ options, root, registry, lobby, network, startedAt, log, gameServer }) {
   const auth = createAdminAuth(options.password);
-  const state = createAdminStore(options.stateFile || path.join(root, '.admin', 'state.json'));
+  const stateFile = options.stateFile || path.join(root, '.admin', 'state.json');
+  const state = createAdminStore(stateFile);
   const metrics = createMetrics({ root });
+  const history = createServiceHistory({ file: path.join(path.dirname(stateFile), 'service-history.jsonl'),
+    probe: () => probeGameServer(gameServer), log });
   const disconnect = (session) => {
     // Explicit departure removes the human seat rather than retaining an offline room.
     lobby.leave(session);
@@ -66,7 +70,7 @@ export function createAdmin({ options, root, registry, lobby, network, startedAt
     });
     const stored = state.get();
     return { now: Date.now(), uptimeSec: (Date.now() - startedAt) / 1000, players, rooms,
-      metrics: metrics.snapshot(), revision: stored.revision, draft: stored.draft, published: stored.published,
+      metrics: metrics.snapshot(), serviceHistory: history.snapshot(), revision: stored.revision, draft: stored.draft, published: stored.published,
       bans: stored.bans.map(({ tokenHash: _secret, ...ban }) => ban), audit: stored.audit.slice(-50).reverse() };
   }
 
@@ -141,10 +145,11 @@ export function createAdmin({ options, root, registry, lobby, network, startedAt
         server.listen(port, options.host || '127.0.0.1', () => { server.off('error', fail); resolve(); });
       });
       server.on('error', e => log.error('[admin] listener', e));
+      await history.start();
       return server.address();
     },
     async close() {
-      auth.close(); metrics.close();
+      auth.close(); metrics.close(); await history.close();
       if (server.listening) await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
     },
   };
